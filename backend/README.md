@@ -1,0 +1,97 @@
+# 后端启动说明
+
+## 0. 必需环境变量
+可在项目根目录 .env 中配置，或运行前手动导出：
+
+- DATABASE_URL=postgresql+psycopg2://wc_user:wc_pass_please_change@127.0.0.1:5432/wc_inspection
+- JWT_SECRET_KEY=change-me-in-production
+- JWT_ALGORITHM=HS256
+- ACCESS_TOKEN_EXPIRE_MINUTES=480
+- AI_PROVIDER_API_KEY=
+- AI_DEFAULT_ENDPOINT=https://api.openai.com/v1/chat/completions
+- AI_DEFAULT_MODEL=gpt-4o-mini
+- AI_PROXY_TIMEOUT_SECONDS=30
+- CORS_ALLOW_ORIGINS=http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:5174,http://localhost:5174,http://127.0.0.1:4173,http://localhost:4173
+
+## 1. 创建并激活虚拟环境（PowerShell）
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
+## 2. 安装依赖
+pip install -r requirements.txt
+
+## 3. 启动服务
+uvicorn app.main:app --reload --port 8000
+
+局域网访问（同一 Wi-Fi 下其他设备访问）请使用：
+uvicorn app.main:app --reload --host 0.0.0.0 --port 18000
+
+说明：
+- 不加 `--host 0.0.0.0` 时，服务默认只监听 `127.0.0.1`，局域网设备无法访问。
+- Windows 需要放行 18000 入站端口（管理员 PowerShell）：
+  - netsh advfirewall firewall add rule name="WC Backend 18000" dir=in action=allow protocol=TCP localport=18000
+- 前端若在局域网其他设备打开，还需把对应来源加入 `CORS_ALLOW_ORIGINS`（例如 `http://10.70.23.141:5173`）。
+
+## 常见启动报错（StringDataRightTruncation）
+如果启动时报错：
+- value too long for type character varying(8)
+
+通常是因为旧库中 `buildings.gender_restriction` 列长度仍为 8，但种子数据会写入 `female_only`（11 个字符）。
+
+可执行以下 SQL 修复（PostgreSQL）：
+ALTER TABLE buildings
+  ALTER COLUMN gender_restriction TYPE VARCHAR(16);
+
+说明：当前项目启动阶段使用 SQLAlchemy `create_all`，不会自动迁移已存在列的长度。
+
+## 4. 关键接口自测
+- GET /healthz
+- POST /auth/login
+- GET /auth/me（Bearer Token）
+- POST /policy/student-access-check
+- POST /policy/teacher-assign-check
+- POST /tasks/validate-assignment
+- POST /tasks/assign（teacher/admin）
+- GET /tasks/my（student）
+- POST /inspections/submit（student）
+- GET /inspections/my（student）
+- GET /inspections/pending-review（teacher/admin）
+- POST /inspections/{inspection_id}/review（teacher/admin）
+- POST /ai/proxy/chat（已登录用户可用）
+
+## 5. 启动后自动生成的测试账号
+- admin / Admin@123456
+- teacher01 / Teacher@123
+- student_f01 / Student@123
+- student_m01 / Student@123
+
+## 6. 权限规则示例请求
+POST /policy/teacher-assign-check
+{
+  "student_gender": "male",
+  "building_code": "dorm-2"
+}
+
+预期返回：
+{
+  "allowed": false,
+  "reason": "Female-only dorm task cannot be assigned to male student."
+}
+
+## 7. 运行测试
+pytest -q
+
+## 8. AI 代理接口示例
+POST /ai/proxy/chat
+{
+  "endpoint": "https://api.openai.com/v1/chat/completions",
+  "api_key": "",
+  "model": "gpt-4o-mini",
+  "system_prompt": "你是巡检分析助手",
+  "user_prompt": "请分析以下巡检异常摘要",
+  "temperature": 0.2
+}
+
+说明：
+- 若 api_key 为空，后端会尝试使用 AI_PROVIDER_API_KEY。
+- 该接口用于前端“后端代理模式”调用，降低浏览器直连暴露风险。

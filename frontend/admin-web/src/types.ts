@@ -1,4 +1,26 @@
-﻿// 文件说明：该文件为弱电巡检系统源码，已按中文注释规范维护。
+﻿// 房间编辑/新增类型
+export interface AssetRoomEdit {
+  building_code: string;
+  building_name?: string;
+  room_code: string;
+  floor_label?: string | null;
+  location_text?: string | null;
+  is_active: boolean;
+}
+
+// 资产编辑/新增类型
+export interface AssetItemEdit {
+  asset_code: string;
+  asset_name: string;
+  asset_category: string;
+  room_code: string;
+  quantity: number;
+  status: string;
+  manufacturer?: string | null;
+  model?: string | null;
+  note?: string | null;
+}
+// 文件说明：该文件为弱电巡检系统源码，已按中文注释规范维护。
 export interface UserProfile {
   id: number;
   username: string;
@@ -37,6 +59,44 @@ export interface TaskAssignmentItem {
   status: string;
 }
 
+export interface PendingTaskManageItem {
+  assignment_id: number;
+  task_id: number;
+  task_title: string;
+  cycle_type: "one_off" | "weekly" | "monthly";
+  student_user_id: number;
+  student_username: string;
+  room_id: number;
+  building_code: string;
+  room_code: string;
+  due_at: string;
+  status: "todo" | "rejected" | "rectify_required" | "overdue";
+}
+
+export interface UpdateTaskAssignmentPayload {
+  task_title?: string;
+  cycle_type?: "one_off" | "weekly" | "monthly";
+  room_id?: number;
+  student_user_id?: number;
+  due_at?: string;
+  status?: "todo" | "rejected" | "rectify_required" | "overdue";
+}
+
+export interface UpdateTaskAssignmentResponse {
+  assignment_id: number;
+  task_id: number;
+  assignment_status: string;
+  message: string;
+}
+
+export interface DeleteTaskAssignmentResponse {
+  assignment_id: number;
+  task_id: number;
+  deleted_inspection_count: number;
+  deleted_photo_count: number;
+  message: string;
+}
+
 export type ReviewAction = "approved" | "rejected" | "rectify_required";
 
 export interface PendingReviewInspectionItem {
@@ -53,6 +113,7 @@ export interface PendingReviewInspectionItem {
   asset_match_state: string;
   remark_text: string | null;
   photo_count: number;
+  photo_urls: string[];
 }
 
 export interface ConsoleInspectionItem {
@@ -65,6 +126,20 @@ export interface ConsoleInspectionItem {
   reviewed_at: string | null;
   status: string;
   photo_count: number;
+  photo_urls: string[];
+}
+
+export interface InspectionPhotoUploadResponse {
+  object_key: string;
+  file_url: string;
+}
+
+export interface DeleteInspectionResponse {
+  inspection_id: number;
+  assignment_id: number;
+  assignment_status: string;
+  deleted_photo_count: number;
+  message: string;
 }
 
 export interface ReviewInspectionResponse {
@@ -99,5 +174,38 @@ export interface AiGatewayConfig {
   apiKey: string;
   model: string;
   systemPrompt: string;
+}
+
+export interface AssetRoomItem {
+  room_id: number;
+  building_code: string;
+  building_name: string;
+  room_code: string;
+  floor_label: string | null;
+  location_text: string | null;
+  is_active: boolean;
+}
+
+export interface AssetItemView {
+  asset_id: number;
+  asset_code: string;
+  asset_name: string;
+  asset_category: string;
+  building_code: string;
+  room_code: string;
+  quantity: number;
+  status: string;
+  manufacturer: string | null;
+  model: string | null;
+  note: string | null;
+  updated_at: string;
+}
+
+export interface ImportSummary {
+  total_rows: number;
+  created_count: number;
+  updated_count: number;
+  skipped_count: number;
+  errors: string[];
 }
 

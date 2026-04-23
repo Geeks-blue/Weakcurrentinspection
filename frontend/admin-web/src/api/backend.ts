@@ -1,9 +1,106 @@
-﻿// 文件说明：该文件为弱电巡检系统源码，已按中文注释规范维护。
+﻿import type { AssetRoomEdit, AssetItemEdit } from "../types";
+// 房间CRUD
+export async function createRoom(payload: AssetRoomEdit): Promise<AssetRoomItem> {
+  const token = getAccessToken();
+  const response = await fetch(`${getBackendBaseUrl()}/assets/room`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(`新增房间失败：${readErrorDetail(data)}`);
+  return data as AssetRoomItem;
+}
+
+export async function updateRoom(room_id: number, payload: AssetRoomEdit): Promise<AssetRoomItem> {
+  const token = getAccessToken();
+  const response = await fetch(`${getBackendBaseUrl()}/assets/room/${room_id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(`编辑房间失败：${readErrorDetail(data)}`);
+  return data as AssetRoomItem;
+}
+
+export async function deleteRoom(room_id: number): Promise<{ ok: boolean }> {
+  const token = getAccessToken();
+  const response = await fetch(`${getBackendBaseUrl()}/assets/room/${room_id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(`删除房间失败：${readErrorDetail(data)}`);
+  return data as { ok: boolean };
+}
+
+export function getRoomQrcodeUrl(room_id: number): string {
+  return `${getBackendBaseUrl()}/assets/room/${room_id}/qrcode?token=${getAccessToken()}`;
+}
+
+// 资产CRUD
+export async function createAsset(payload: AssetItemEdit): Promise<AssetItemView> {
+  const token = getAccessToken();
+  const response = await fetch(`${getBackendBaseUrl()}/assets/item`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(`新增资产失败：${readErrorDetail(data)}`);
+  return data as AssetItemView;
+}
+
+export async function updateAsset(asset_id: number, payload: AssetItemEdit): Promise<AssetItemView> {
+  const token = getAccessToken();
+  const response = await fetch(`${getBackendBaseUrl()}/assets/item/${asset_id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(`编辑资产失败：${readErrorDetail(data)}`);
+  return data as AssetItemView;
+}
+
+export async function deleteAsset(asset_id: number): Promise<{ ok: boolean }> {
+  const token = getAccessToken();
+  const response = await fetch(`${getBackendBaseUrl()}/assets/item/${asset_id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(`删除资产失败：${readErrorDetail(data)}`);
+  return data as { ok: boolean };
+}
+
+export function getAssetQrcodeUrl(asset_id: number): string {
+  return `${getBackendBaseUrl()}/assets/item/${asset_id}/qrcode?token=${getAccessToken()}`;
+}
+// 文件说明：该文件为弱电巡检系统源码，已按中文注释规范维护。
 import type {
   ConsoleInspectionItem,
+  DeleteInspectionResponse,
   DispatchRoomOption,
   DispatchStudentOption,
+  AssetItemView,
+  AssetRoomItem,
+  ImportSummary,
   LoginResponse,
+  InspectionPhotoUploadResponse,
   PendingReviewInspectionItem,
   RegisterUserRequest,
   RegisterUserResponse,
@@ -11,7 +108,11 @@ import type {
   ReviewInspectionResponse,
   TaskDispatchOptionsResponse,
   TaskAssignmentItem,
-  UserProfile
+  UserProfile,
+  DeleteTaskAssignmentResponse,
+  PendingTaskManageItem,
+  UpdateTaskAssignmentPayload,
+  UpdateTaskAssignmentResponse
 } from "../types";
 import { frontendConfig } from "../config";
 
@@ -113,6 +214,27 @@ export async function getPendingReviewInspections(): Promise<PendingReviewInspec
   return (await response.json()) as PendingReviewInspectionItem[];
 }
 
+export async function uploadInspectionPhoto(file: Blob, filename: string): Promise<InspectionPhotoUploadResponse> {
+  const token = getAccessToken();
+  const formData = new FormData();
+  formData.append("file", file, filename);
+
+  const response = await fetch(`${getBackendBaseUrl()}/inspections/photos/upload`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`
+    },
+    body: formData
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(`上传照片失败：${readErrorDetail(data)}`);
+  }
+
+  return data as InspectionPhotoUploadResponse;
+}
+
 export async function getConsoleInspections(limit = 120): Promise<ConsoleInspectionItem[]> {
   const token = getAccessToken();
   const response = await fetch(`${getBackendBaseUrl()}/inspections/console-records?limit=${limit}`, {
@@ -127,6 +249,23 @@ export async function getConsoleInspections(limit = 120): Promise<ConsoleInspect
   }
 
   return (await response.json()) as ConsoleInspectionItem[];
+}
+
+export async function deleteInspectionRecord(inspectionId: number): Promise<DeleteInspectionResponse> {
+  const token = getAccessToken();
+  const response = await fetch(`${getBackendBaseUrl()}/inspections/${inspectionId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(`删除失败：${readErrorDetail(data)}`);
+  }
+
+  return data as DeleteInspectionResponse;
 }
 
 export async function reviewInspection(
@@ -185,6 +324,110 @@ export async function getTaskDispatchOptions(): Promise<TaskDispatchOptionsRespo
   }
 
   return (await response.json()) as TaskDispatchOptionsResponse;
+}
+
+export async function getPendingTaskAssignments(): Promise<PendingTaskManageItem[]> {
+  const token = getAccessToken();
+  const response = await fetch(`${getBackendBaseUrl()}/tasks/pending`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`加载待巡检任务失败：${response.status}`);
+  }
+
+  return (await response.json()) as PendingTaskManageItem[];
+}
+
+export async function updateTaskAssignment(
+  assignmentId: number,
+  payload: UpdateTaskAssignmentPayload
+): Promise<UpdateTaskAssignmentResponse> {
+  const token = getAccessToken();
+  const response = await fetch(`${getBackendBaseUrl()}/tasks/${assignmentId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(`修改任务失败：${readErrorDetail(data)}`);
+  }
+
+  return data as UpdateTaskAssignmentResponse;
+}
+
+export async function deleteTaskAssignment(assignmentId: number): Promise<DeleteTaskAssignmentResponse> {
+  const token = getAccessToken();
+  const response = await fetch(`${getBackendBaseUrl()}/tasks/${assignmentId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(`删除任务失败：${readErrorDetail(data)}`);
+  }
+
+  return data as DeleteTaskAssignmentResponse;
+}
+
+export async function getAssetRooms(): Promise<AssetRoomItem[]> {
+  const token = getAccessToken();
+  const response = await fetch(`${getBackendBaseUrl()}/assets/rooms`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) {
+    throw new Error(`加载房间资产台账失败：${response.status}`);
+  }
+  return (await response.json()) as AssetRoomItem[];
+}
+
+export async function getAssets(): Promise<AssetItemView[]> {
+  const token = getAccessToken();
+  const response = await fetch(`${getBackendBaseUrl()}/assets/items`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) {
+    throw new Error(`加载资产列表失败：${response.status}`);
+  }
+  return (await response.json()) as AssetItemView[];
+}
+
+async function postImportFile(path: string, file: File): Promise<ImportSummary> {
+  const token = getAccessToken();
+  const form = new FormData();
+  form.append("file", file, file.name);
+
+  const response = await fetch(`${getBackendBaseUrl()}${path}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(`导入失败：${readErrorDetail(data)}`);
+  }
+  return data as ImportSummary;
+}
+
+export async function importRoomsTable(file: File): Promise<ImportSummary> {
+  return await postImportFile("/assets/import/rooms", file);
+}
+
+export async function importAssetsTable(file: File): Promise<ImportSummary> {
+  return await postImportFile("/assets/import/items", file);
 }
 
 export interface CreateTaskAssignmentPayload {

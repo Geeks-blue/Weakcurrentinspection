@@ -5,8 +5,14 @@ export interface FrontendConfig {
   mobileWebUrl: string;
 }
 
+function resolveHostPort(port: number): string {
+  const protocol = typeof window !== "undefined" ? window.location.protocol : "http:";
+  const hostname = typeof window !== "undefined" ? window.location.hostname : "127.0.0.1";
+  return `${protocol}//${hostname}:${port}`;
+}
+
 export const frontendConfig: FrontendConfig = {
-  backendBaseUrl: "http://192.168.18.102:18000",
-  mobileWebUrl: "http://192.168.18.102:5174"
+  backendBaseUrl: resolveHostPort(18000),
+  mobileWebUrl: resolveHostPort(5174)
 };
 

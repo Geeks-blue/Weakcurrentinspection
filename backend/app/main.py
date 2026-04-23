@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.ai import router as ai_router
+from app.api.assets import router as assets_router
 from app.api.auth import router as auth_router
 from app.api.inspections import router as inspections_router
 from app.api.policy import router as policy_router
@@ -39,5 +40,6 @@ app.include_router(policy_router, prefix="/policy", tags=["policy"])
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(tasks_router, prefix="/tasks", tags=["tasks"])
 app.include_router(inspections_router, prefix="/inspections", tags=["inspections"])
+app.include_router(assets_router, prefix="/assets", tags=["assets"])
 app.include_router(ai_router, prefix="/ai", tags=["ai"])
 

@@ -11,6 +11,8 @@ import {
   login,
   saveToken,
   submitInspection,
+  uploadInspectionPhoto,
+  type MyInspectionItem,
   type TaskItem
 } from "./api";
 
@@ -19,6 +21,7 @@ const password = ref("Student@123");
 const loginMessage = ref("");
 const loading = ref(false);
 const currentRole = ref("");
+const currentUsername = ref("");
 
 const tasks = ref<TaskItem[]>([]);
 const selectedAssignmentId = ref<number | null>(null);
@@ -34,17 +37,27 @@ const clutterState = ref<"none" | "stacked_items" | "water" | "odor">("none");
 const indicatorState = ref<"all_ok" | "partial_abnormal" | "all_abnormal">("all_ok");
 const assetMatchState = ref<"matched" | "missing" | "extra" | "moved">("matched");
 const remark = ref("");
-const photoKeysText = ref("photo-1.jpg");
+
+type CapturedPhoto = {
+  id: string;
+  key: string;
+  previewUrl: string;
+  createdAt: string;
+};
+
+const cameraInput = ref<HTMLInputElement | null>(null);
+const capturedPhotos = ref<CapturedPhoto[]>([]);
+const photoStatus = ref("未拍照");
+const photoError = ref("");
+const photoBusy = ref(false);
 
 const submitMessage = ref("");
 const submitError = ref("");
-const myInspections = ref<any[]>([]);
+const myInspections = ref<MyInspectionItem[]>([]);
+const previewPhotoUrl = ref("");
 
 const photoKeys = computed(() =>
-  photoKeysText.value
-    .split("\n")
-    .map((item) => item.trim())
-    .filter((item) => Boolean(item))
+  capturedPhotos.value.map((item) => item.key)
 );
 
 const isStudentLoggedIn = computed(() => currentRole.value === "student" && Boolean(getToken()));
@@ -64,9 +77,207 @@ const canSubmit = computed(() => {
     }
   }
 
-  const count = photoKeys.value.length;
+  const count = capturedPhotos.value.length;
   return count >= 1 && count <= 5;
 });
+
+function generatePhotoKey(index: number): string {
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const safeUser = (currentUsername.value || username.value.trim() || "student").replace(/[^a-zA-Z0-9_-]/g, "_");
+  return `${safeUser}_${stamp}_${String(index + 1).padStart(2, "0")}.jpg`;
+}
+
+function formatWatermarkTime(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("图片加载失败"));
+    image.src = src;
+  });
+}
+
+function drawCoverImage(
+  context: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  width: number,
+  height: number
+): void {
+  const scale = Math.max(width / image.width, height / image.height);
+  const drawWidth = image.width * scale;
+  const drawHeight = image.height * scale;
+  const x = (width - drawWidth) / 2;
+  const y = (height - drawHeight) / 2;
+  context.drawImage(image, x, y, drawWidth, drawHeight);
+}
+
+function buildNoCacheUrl(url: string): string {
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}t=${Date.now()}`;
+}
+
+function pickLatestBackendPhotoUrl(): string {
+  // 严格仅使用后端历史已提交巡检记录中的最新照片。
+  for (const inspection of myInspections.value) {
+    if (inspection.photo_urls && inspection.photo_urls.length > 0) {
+      return inspection.photo_urls[inspection.photo_urls.length - 1];
+    }
+  }
+  return "";
+}
+
+async function refreshInspectionsForReference(): Promise<void> {
+  try {
+    myInspections.value = await loadMyInspections();
+  } catch {
+    // 参考图刷新失败不阻断拍照流程。
+  }
+}
+
+async function renderWatermarkedPhoto(file: File): Promise<string> {
+  const currentImageUrl = URL.createObjectURL(file);
+  try {
+    const currentImage = await loadImage(currentImageUrl);
+    const canvas = document.createElement("canvas");
+    const maxWidth = 1600;
+    const scale = Math.min(1, maxWidth / currentImage.width);
+    canvas.width = Math.max(1, Math.round(currentImage.width * scale));
+    canvas.height = Math.max(1, Math.round(currentImage.height * scale));
+
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("无法创建图片画布");
+    }
+
+    context.save();
+    context.fillStyle = "#0f172a";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.restore();
+
+    const latestBackendPhotoUrl = pickLatestBackendPhotoUrl();
+    if (latestBackendPhotoUrl) {
+      const previousImage = await loadImage(buildNoCacheUrl(latestBackendPhotoUrl));
+      context.save();
+      context.globalAlpha = 0.18;
+      drawCoverImage(context, previousImage, canvas.width, canvas.height);
+      context.restore();
+    }
+
+    drawCoverImage(context, currentImage, canvas.width, canvas.height);
+
+    const watermarkHeight = Math.max(84, Math.round(canvas.height * 0.16));
+    const gradient = context.createLinearGradient(0, canvas.height - watermarkHeight, 0, canvas.height);
+    gradient.addColorStop(0, "rgba(4, 10, 24, 0)");
+    gradient.addColorStop(0.38, "rgba(4, 10, 24, 0.26)");
+    gradient.addColorStop(1, "rgba(4, 10, 24, 0.82)");
+    context.fillStyle = gradient;
+    context.fillRect(0, canvas.height - watermarkHeight, canvas.width, watermarkHeight);
+
+    const now = new Date();
+    const watermarkUser = currentUsername.value || username.value.trim() || "学生";
+    context.fillStyle = "rgba(255, 255, 255, 0.96)";
+    context.font = `${Math.max(18, Math.round(canvas.width * 0.022))}px "Noto Sans SC", sans-serif`;
+    context.textBaseline = "top";
+    context.fillText(`时间：${formatWatermarkTime(now)}`, 18, canvas.height - watermarkHeight + 14);
+    context.fillText(`地点：弱电巡检`, 18, canvas.height - watermarkHeight + 42);
+    context.fillText(`拍摄人：${watermarkUser}`, 18, canvas.height - watermarkHeight + 70);
+
+    context.strokeStyle = "rgba(255, 255, 255, 0.65)";
+    context.lineWidth = 2;
+    context.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+
+    return canvas.toDataURL("image/jpeg", 0.9);
+  } finally {
+    URL.revokeObjectURL(currentImageUrl);
+  }
+}
+
+async function uploadWatermarkedPhoto(dataUrl: string, filename: string): Promise<{ key: string; url: string }> {
+  const imageResponse = await fetch(dataUrl);
+  const blob = await imageResponse.blob();
+  const uploaded = await uploadInspectionPhoto(blob, filename);
+  return { key: uploaded.object_key, url: uploaded.file_url };
+}
+
+function openCameraPicker(): void {
+  photoError.value = "";
+  cameraInput.value?.click();
+}
+
+async function handleCameraInput(event: Event): Promise<void> {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  target.value = "";
+
+  if (!file) {
+    return;
+  }
+
+  if (capturedPhotos.value.length >= 5) {
+    photoError.value = "照片最多 5 张，请先删除一张再继续拍摄。";
+    return;
+  }
+
+  if (!file.type.startsWith("image/")) {
+    photoError.value = "请选择图片文件。";
+    return;
+  }
+
+  photoBusy.value = true;
+  photoError.value = "";
+
+  try {
+    await refreshInspectionsForReference();
+    const previewDataUrl = await renderWatermarkedPhoto(file);
+    const nextIndex = capturedPhotos.value.length;
+    const now = new Date();
+    const generatedKey = generatePhotoKey(nextIndex);
+    const uploaded = await uploadWatermarkedPhoto(previewDataUrl, generatedKey);
+    capturedPhotos.value = [
+      ...capturedPhotos.value,
+      {
+        id: `${now.getTime()}-${nextIndex}`,
+        key: uploaded.key,
+        previewUrl: uploaded.url || previewDataUrl,
+        createdAt: now.toISOString()
+      }
+    ];
+    photoStatus.value = `已拍摄 ${capturedPhotos.value.length} 张`;
+  } catch (error) {
+    photoError.value = error instanceof Error ? error.message : "拍照处理失败";
+  } finally {
+    photoBusy.value = false;
+  }
+}
+
+function removePhoto(photoId: string): void {
+  capturedPhotos.value = capturedPhotos.value.filter((item) => item.id !== photoId);
+  photoStatus.value = capturedPhotos.value.length ? `已拍摄 ${capturedPhotos.value.length} 张` : "未拍照";
+}
+
+function clearPhotos(): void {
+  capturedPhotos.value = [];
+  photoStatus.value = "未拍照";
+  photoError.value = "";
+}
+
+function openPhotoPreview(url: string): void {
+  previewPhotoUrl.value = url;
+}
+
+function closePhotoPreview(): void {
+  previewPhotoUrl.value = "";
+}
 
 function isStudentRole(role: string): boolean {
   return role === "student";
@@ -124,6 +335,7 @@ async function doLogin(): Promise<void> {
 
     saveToken(result.access_token);
     currentRole.value = result.user.role;
+    currentUsername.value = result.user.username;
     loginMessage.value = `登录成功：${result.user.username}`;
     await refreshTasks();
     await refreshInspections();
@@ -137,9 +349,12 @@ async function doLogin(): Promise<void> {
 function doLogout(): void {
   clearToken();
   currentRole.value = "";
+  currentUsername.value = "";
   tasks.value = [];
   selectedAssignmentId.value = null;
   myInspections.value = [];
+  clearPhotos();
+  closePhotoPreview();
   loginMessage.value = "已退出";
 }
 
@@ -217,12 +432,14 @@ onMounted(async () => {
     }
 
     currentRole.value = user.role;
+    currentUsername.value = user.username;
     loginMessage.value = `已恢复登录：${user.username}`;
     await refreshTasks();
     await refreshInspections();
   } catch (error) {
     clearToken();
     currentRole.value = "";
+    currentUsername.value = "";
     loginMessage.value = error instanceof Error ? error.message : "登录状态失效，请重新登录";
   } finally {
     loading.value = false;
@@ -294,6 +511,52 @@ onMounted(async () => {
         <p class="hint" v-if="tasks.length === 0">暂无可用任务，请先用教师账号分配任务。</p>
       </section>
 
+      <section class="card camera-card">
+        <h2>照片采集</h2>
+        <p class="hint">点击拍照后会调用摄像头；新照片会自动叠加上一张照片作为参考层，并写入时间、弱电巡检、学生名称水印。</p>
+        <input
+          ref="cameraInput"
+          class="camera-input"
+          type="file"
+          accept="image/*"
+          capture="environment"
+          @change="handleCameraInput"
+        />
+
+        <div class="photo-toolbar">
+          <button :disabled="photoBusy" @click="openCameraPicker">{{ photoBusy ? "处理中..." : "拍照" }}</button>
+          <button class="ghost" :disabled="capturedPhotos.length === 0" @click="clearPhotos">清空照片</button>
+          <span class="hint">{{ photoStatus }}</span>
+        </div>
+
+        <p class="error" v-if="photoError">{{ photoError }}</p>
+
+        <div class="photo-stage" v-if="capturedPhotos.length > 0">
+          <div class="photo-stage-frame">
+            <img class="photo-stage-image" :src="capturedPhotos[capturedPhotos.length - 1].previewUrl" alt="最新拍摄照片" />
+            <div class="photo-stage-reference" v-if="capturedPhotos.length > 1">
+              <img :src="capturedPhotos[capturedPhotos.length - 2].previewUrl" alt="上一张参考照片" />
+            </div>
+            <div class="photo-stage-label">
+              <span>时间水印已写入</span>
+              <span>弱电巡检 · {{ currentUsername || username }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="photo-grid" v-if="capturedPhotos.length > 0">
+          <article class="photo-item" v-for="(photo, index) in capturedPhotos" :key="photo.id">
+            <img :src="photo.previewUrl" :alt="`照片 ${index + 1}`" @click="openPhotoPreview(photo.previewUrl)" />
+            <div class="photo-item-meta">
+              <strong>第 {{ index + 1 }} 张</strong>
+              <span>{{ new Date(photo.createdAt).toLocaleString() }}</span>
+              <span>{{ photo.key }}</span>
+            </div>
+            <button class="ghost photo-item-remove" @click="removePhoto(photo.id)">删除</button>
+          </article>
+        </div>
+      </section>
+
       <section class="card">
         <h2>巡检表单</h2>
         <label>签到方式</label>
@@ -347,8 +610,6 @@ onMounted(async () => {
         <label>备注</label>
         <textarea v-model="remark" rows="3" placeholder="可选" />
 
-        <label>照片 Key（每行一条，1-5 张）</label>
-        <textarea v-model="photoKeysText" rows="5" placeholder="photo-1.jpg" />
         <p class="hint">当前照片数：{{ photoKeys.length }}（要求 1-5）</p>
 
         <button :disabled="!canSubmit" @click="submit">提交巡检</button>
@@ -364,10 +625,24 @@ onMounted(async () => {
             <strong>ID {{ item.inspection_id }}</strong>
             <span>{{ item.building_code }} / {{ item.room_code }}</span>
             <span>状态：{{ item.status }}，照片：{{ item.photo_count }}</span>
+            <div class="history-photo-grid" v-if="item.photo_urls.length > 0">
+              <img
+                v-for="photoUrl in item.photo_urls"
+                :key="photoUrl"
+                :src="photoUrl"
+                alt="巡检历史照片"
+                @click="openPhotoPreview(photoUrl)"
+              />
+            </div>
           </li>
         </ul>
         <p class="hint" v-if="myInspections.length === 0">暂无巡检记录</p>
       </section>
+
+      <div class="photo-lightbox" v-if="previewPhotoUrl" @click.self="closePhotoPreview">
+        <button class="photo-lightbox-close" @click="closePhotoPreview">关闭</button>
+        <img :src="previewPhotoUrl" alt="照片预览" />
+      </div>
     </template>
   </div>
 </template>

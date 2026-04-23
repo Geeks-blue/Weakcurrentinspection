@@ -1,5 +1,6 @@
 ﻿# 文件说明：该文件为弱电巡检系统源码，已按中文注释规范维护。
 from datetime import UTC, datetime
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -8,17 +9,31 @@ from sqlalchemy.orm import Session
 
 from app.core.policies import assert_student_can_access_room, assert_teacher_can_assign
 from app.deps import get_current_user, get_db, require_teacher_or_admin
-from app.models.entities import Building, InspectionTask, Room, TaskAssignment, User
+from app.models.entities import (
+    Building,
+    Inspection,
+    InspectionPhoto,
+    InspectionReviewLog,
+    InspectionTask,
+    Room,
+    TaskAssignment,
+    User,
+)
 from app.schemas.task import (
     CreateTaskAssignmentRequest,
     DispatchRoomOption,
     DispatchStudentOption,
+    PendingTaskManageItem,
+    TaskAssignmentDeleteResponse,
     TaskDispatchOptionsResponse,
     TaskAssignmentCreateResponse,
     TaskAssignmentItem,
+    TaskAssignmentUpdateResponse,
+    UpdateTaskAssignmentRequest,
 )
 
 router = APIRouter()
+UPLOAD_DIR = Path(__file__).resolve().parents[2] / "storage" / "inspection_photos"
 
 
 class TaskAssignmentValidationRequest(BaseModel):
@@ -187,4 +202,165 @@ def my_tasks(
         )
 
     return result
+
+
+@router.get("/pending", response_model=list[PendingTaskManageItem])
+def pending_tasks(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_teacher_or_admin),
+) -> list[PendingTaskManageItem]:
+    # 控制台任务管理：仅展示待巡检任务。
+    active_statuses = {"todo", "rejected", "rectify_required", "overdue"}
+    rows = (
+        db.query(TaskAssignment, InspectionTask, Room, Building, User)
+        .join(InspectionTask, TaskAssignment.task_id == InspectionTask.id)
+        .join(Room, TaskAssignment.room_id == Room.id)
+        .join(Building, Room.building_id == Building.id)
+        .join(User, TaskAssignment.student_user_id == User.id)
+        .filter(TaskAssignment.status.in_(active_statuses))
+        .order_by(TaskAssignment.due_at.asc(), TaskAssignment.id.asc())
+        .all()
+    )
+
+    return [
+        PendingTaskManageItem(
+            assignment_id=assignment.id,
+            task_id=task.id,
+            task_title=task.title,
+            cycle_type=task.cycle_type,
+            student_user_id=student.id,
+            student_username=student.username,
+            room_id=room.id,
+            building_code=building.code,
+            room_code=room.room_code,
+            due_at=assignment.due_at,
+            status=assignment.status,
+        )
+        for assignment, task, room, building, student in rows
+    ]
+
+
+@router.patch("/{assignment_id}", response_model=TaskAssignmentUpdateResponse)
+def update_assignment(
+    assignment_id: int,
+    payload: UpdateTaskAssignmentRequest,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_teacher_or_admin),
+) -> TaskAssignmentUpdateResponse:
+    row = (
+        db.query(TaskAssignment, InspectionTask, Room, Building, User)
+        .join(InspectionTask, TaskAssignment.task_id == InspectionTask.id)
+        .join(Room, TaskAssignment.room_id == Room.id)
+        .join(Building, Room.building_id == Building.id)
+        .join(User, TaskAssignment.student_user_id == User.id)
+        .filter(TaskAssignment.id == assignment_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found")
+
+    assignment, task, room, _, student = row
+    next_room = room
+    next_student = student
+
+    if payload.room_id is not None and payload.room_id != room.id:
+        next_room_row = (
+            db.query(Room, Building)
+            .join(Building, Room.building_id == Building.id)
+            .filter(Room.id == payload.room_id, Room.is_active.is_(True))
+            .first()
+        )
+        if not next_room_row:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
+        next_room = next_room_row[0]
+
+    if payload.student_user_id is not None and payload.student_user_id != student.id:
+        next_student = (
+            db.query(User)
+            .filter(User.id == payload.student_user_id, User.role == "student", User.is_active.is_(True))
+            .first()
+        )
+        if not next_student:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student user not found")
+
+    policy_row = (
+        db.query(Building)
+        .join(Room, Room.building_id == Building.id)
+        .filter(Room.id == next_room.id)
+        .first()
+    )
+    if not policy_row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Building not found")
+    assert_teacher_can_assign(next_student.gender or "", policy_row.code)
+
+    if payload.task_title is not None:
+        task.title = payload.task_title
+    if payload.cycle_type is not None:
+        task.cycle_type = payload.cycle_type
+    if payload.room_id is not None:
+        assignment.room_id = next_room.id
+    if payload.student_user_id is not None:
+        assignment.student_user_id = next_student.id
+    if payload.due_at is not None:
+        assignment.due_at = payload.due_at
+    if payload.status is not None:
+        assignment.status = payload.status
+
+    db.commit()
+
+    return TaskAssignmentUpdateResponse(
+        assignment_id=assignment.id,
+        task_id=task.id,
+        assignment_status=assignment.status,
+        message="Task assignment updated",
+    )
+
+
+@router.delete("/{assignment_id}", response_model=TaskAssignmentDeleteResponse)
+def delete_assignment(
+    assignment_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_teacher_or_admin),
+) -> TaskAssignmentDeleteResponse:
+    row = (
+        db.query(TaskAssignment, InspectionTask)
+        .join(InspectionTask, TaskAssignment.task_id == InspectionTask.id)
+        .filter(TaskAssignment.id == assignment_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found")
+
+    assignment, task = row
+    inspections = db.query(Inspection).filter(Inspection.assignment_id == assignment.id).all()
+    deleted_inspection_count = 0
+    deleted_photo_count = 0
+
+    for inspection in inspections:
+        photos = db.query(InspectionPhoto).filter(InspectionPhoto.inspection_id == inspection.id).all()
+        for photo in photos:
+            file_path = UPLOAD_DIR / photo.object_key
+            if file_path.exists() and file_path.is_file():
+                file_path.unlink(missing_ok=True)
+            db.delete(photo)
+            deleted_photo_count += 1
+
+        logs = db.query(InspectionReviewLog).filter(InspectionReviewLog.inspection_id == inspection.id).all()
+        for log in logs:
+            db.delete(log)
+
+        db.delete(inspection)
+        deleted_inspection_count += 1
+
+    db.delete(assignment)
+
+    db.commit()
+
+    return TaskAssignmentDeleteResponse(
+        assignment_id=assignment_id,
+        task_id=task.id,
+        deleted_inspection_count=deleted_inspection_count,
+        deleted_photo_count=deleted_photo_count,
+        message="Task assignment deleted",
+    )
 

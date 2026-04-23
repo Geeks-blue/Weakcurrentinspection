@@ -58,6 +58,7 @@ class InspectionItem(BaseModel):
     indicator_state: str
     asset_match_state: str
     photo_count: int
+    photo_urls: list[str]
 
 
 ReviewAction = Literal["approved", "rejected", "rectify_required"]
@@ -77,6 +78,7 @@ class PendingReviewInspectionItem(BaseModel):
     asset_match_state: str
     remark_text: str | None
     photo_count: int
+    photo_urls: list[str]
 
 
 class ConsoleInspectionItem(BaseModel):
@@ -89,6 +91,20 @@ class ConsoleInspectionItem(BaseModel):
     reviewed_at: datetime | None
     status: str
     photo_count: int
+    photo_urls: list[str]
+
+
+class InspectionPhotoUploadResponse(BaseModel):
+    object_key: str
+    file_url: str
+
+
+class InspectionDeleteResponse(BaseModel):
+    inspection_id: int
+    assignment_id: int
+    assignment_status: str
+    deleted_photo_count: int
+    message: str
 
 
 class InspectionReviewRequest(BaseModel):

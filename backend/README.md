@@ -11,7 +11,7 @@
 - AI_DEFAULT_ENDPOINT=https://api.openai.com/v1/chat/completions
 - AI_DEFAULT_MODEL=gpt-4o-mini
 - AI_PROXY_TIMEOUT_SECONDS=30
-- CORS_ALLOW_ORIGINS=http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:5174,http://localhost:5174,http://127.0.0.1:4173,http://localhost:4173
+- CORS_ALLOW_ORIGINS=*
 
 ## 1. 创建并激活虚拟环境（PowerShell）
 python -m venv .venv
@@ -30,7 +30,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 18000
 - 不加 `--host 0.0.0.0` 时，服务默认只监听 `127.0.0.1`，局域网设备无法访问。
 - Windows 需要放行 18000 入站端口（管理员 PowerShell）：
   - netsh advfirewall firewall add rule name="WC Backend 18000" dir=in action=allow protocol=TCP localport=18000
-- 前端若在局域网其他设备打开，还需把对应来源加入 `CORS_ALLOW_ORIGINS`（例如 `http://10.70.23.141:5173`）。
+- 前端登录地址现在会跟随当前浏览器访问的主机名自动拼接后端和移动端端口，因此局域网访问时不再需要手工改代码里的 `127.0.0.1`。
 
 ## 常见启动报错（StringDataRightTruncation）
 如果启动时报错：

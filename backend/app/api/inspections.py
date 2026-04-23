@@ -1,7 +1,10 @@
 ﻿# 文件说明：该文件为弱电巡检系统源码，已按中文注释规范维护。
 from datetime import UTC, datetime
+from pathlib import Path
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.core.policies import assert_student_can_access_room
@@ -17,19 +20,79 @@ from app.models.entities import (
 )
 from app.schemas.inspection import (
     ConsoleInspectionItem,
+    InspectionDeleteResponse,
     InspectionItem,
     InspectionReviewRequest,
     InspectionReviewResponse,
     InspectionSubmitRequest,
     InspectionSubmitResponse,
     PendingReviewInspectionItem,
+    InspectionPhotoUploadResponse,
 )
 
 router = APIRouter()
+UPLOAD_DIR = Path(__file__).resolve().parents[2] / "storage" / "inspection_photos"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _build_photo_url(request: Request, object_key: str) -> str:
+    return str(request.url_for("get_inspection_photo", object_key=object_key))
+
+
+def _list_photo_urls(request: Request, inspection_id: int, db: Session) -> list[str]:
+    photos = (
+        db.query(InspectionPhoto)
+        .filter(InspectionPhoto.inspection_id == inspection_id)
+        .order_by(InspectionPhoto.created_at.asc())
+        .all()
+    )
+    return [_build_photo_url(request, photo.object_key) for photo in photos]
+
+
+@router.post("/photos/upload", response_model=InspectionPhotoUploadResponse)
+async def upload_inspection_photo(
+    request: Request,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+) -> InspectionPhotoUploadResponse:
+    # 上传图片先落到后端，再由前端在提交巡检时引用 object_key。
+    if current_user.role != "student":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Student role required")
+
+    image_suffixes = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".heic", ".heif"}
+    suffix = Path(file.filename or "").suffix.lower() or ".jpg"
+    content_type = (file.content_type or "").lower()
+    if content_type and not content_type.startswith("image/"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only image files are allowed")
+    if not content_type and suffix not in image_suffixes:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only image files are allowed")
+
+    object_key = f"{current_user.username}-{uuid4().hex}{suffix}"
+    file_path = UPLOAD_DIR / object_key
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty file is not allowed")
+    file_path.write_bytes(content)
+
+    return InspectionPhotoUploadResponse(
+        object_key=object_key,
+        file_url=_build_photo_url(request, object_key),
+    )
+
+
+@router.get("/photos/{object_key}")
+def get_inspection_photo(object_key: str) -> FileResponse:
+    # 控制台和移动端都通过这个地址读取已上传的巡检照片。
+    file_path = UPLOAD_DIR / object_key
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Photo not found")
+    return FileResponse(file_path)
 
 
 @router.get("/console-records", response_model=list[ConsoleInspectionItem])
 def console_records(
+    request: Request,
     limit: int = Query(default=120, ge=1, le=500),
     db: Session = Depends(get_db),
     _: User = Depends(require_teacher_or_admin),
@@ -63,6 +126,7 @@ def console_records(
                 reviewed_at=inspection.reviewed_at,
                 status=inspection.status,
                 photo_count=photo_count,
+                photo_urls=_list_photo_urls(request, inspection.id, db) if request else [],
             )
         )
 
@@ -135,6 +199,7 @@ def submit_inspection(
 
 @router.get("/my", response_model=list[InspectionItem])
 def my_inspections(
+    request: Request,
     status_filter: str | None = Query(default=None, alias="status"),
     room_code: str | None = Query(default=None),
     db: Session = Depends(get_db),
@@ -185,6 +250,7 @@ def my_inspections(
                 indicator_state=inspection.indicator_state,
                 asset_match_state=inspection.asset_match_state,
                 photo_count=photo_count,
+                photo_urls=_list_photo_urls(request, inspection.id, db) if request else [],
             )
         )
 
@@ -193,6 +259,7 @@ def my_inspections(
 
 @router.get("/pending-review", response_model=list[PendingReviewInspectionItem])
 def pending_review_list(
+    request: Request,
     room_code: str | None = Query(default=None),
     student_username: str | None = Query(default=None),
     db: Session = Depends(get_db),
@@ -238,10 +305,56 @@ def pending_review_list(
                 asset_match_state=inspection.asset_match_state,
                 remark_text=inspection.remark_text,
                 photo_count=photo_count,
+                photo_urls=_list_photo_urls(request, inspection.id, db) if request else [],
             )
         )
 
     return result
+
+
+@router.delete("/{inspection_id}", response_model=InspectionDeleteResponse)
+def delete_inspection(
+    inspection_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_teacher_or_admin),
+) -> InspectionDeleteResponse:
+    # 删除巡检记录时，同步清理照片与审核日志，并将任务状态回退为待处理。
+    row = (
+        db.query(Inspection, TaskAssignment)
+        .join(TaskAssignment, Inspection.assignment_id == TaskAssignment.id)
+        .filter(Inspection.id == inspection_id)
+        .first()
+    )
+
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inspection not found")
+
+    inspection, assignment = row
+    photos = db.query(InspectionPhoto).filter(InspectionPhoto.inspection_id == inspection.id).all()
+    logs = db.query(InspectionReviewLog).filter(InspectionReviewLog.inspection_id == inspection.id).all()
+
+    deleted_photo_count = 0
+    for photo in photos:
+        file_path = UPLOAD_DIR / photo.object_key
+        if file_path.exists() and file_path.is_file():
+            file_path.unlink(missing_ok=True)
+        db.delete(photo)
+        deleted_photo_count += 1
+
+    for log in logs:
+        db.delete(log)
+
+    assignment.status = "todo"
+    db.delete(inspection)
+    db.commit()
+
+    return InspectionDeleteResponse(
+        inspection_id=inspection_id,
+        assignment_id=assignment.id,
+        assignment_status=assignment.status,
+        deleted_photo_count=deleted_photo_count,
+        message="Inspection deleted successfully",
+    )
 
 
 @router.post("/{inspection_id}/review", response_model=InspectionReviewResponse)

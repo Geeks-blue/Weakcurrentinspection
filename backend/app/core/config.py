@@ -20,7 +20,7 @@ class Settings:
     ai_proxy_timeout_seconds: int = int(os.getenv("AI_PROXY_TIMEOUT_SECONDS", "30"))
     cors_allow_origins: str = os.getenv(
         "CORS_ALLOW_ORIGINS",
-        "http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:5174,http://localhost:5174,http://127.0.0.1:4173,http://localhost:4173,http://10.70.23.141:5174,http://10.70.23.141:5173",
+        "*",
     )
 
     @property

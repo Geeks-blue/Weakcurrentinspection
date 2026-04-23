@@ -45,6 +45,26 @@ export interface SubmitResponse {
   message: string;
 }
 
+export interface MyInspectionItem {
+  inspection_id: number;
+  assignment_id: number;
+  building_code: string;
+  room_code: string;
+  submitted_at: string;
+  status: string;
+  lock_state: string;
+  clutter_state: string;
+  indicator_state: string;
+  asset_match_state: string;
+  photo_count: number;
+  photo_urls: string[];
+}
+
+export interface InspectionPhotoUploadResponse {
+  object_key: string;
+  file_url: string;
+}
+
 const TOKEN_KEY = "wc.mobile.token";
 
 export function getBackendUrl(): string {
@@ -113,13 +133,44 @@ export async function submitInspection(payload: SubmitPayload): Promise<SubmitRe
   return data as SubmitResponse;
 }
 
-export async function loadMyInspections(): Promise<any[]> {
+export async function loadMyInspections(): Promise<MyInspectionItem[]> {
   const response = await fetch(`${getBackendUrl()}/inspections/my`, {
     headers: { Authorization: `Bearer ${getToken()}` }
   });
   if (!response.ok) {
     throw new Error(`获取记录失败: ${response.status}`);
   }
-  return (await response.json()) as any[];
+  return (await response.json()) as MyInspectionItem[];
+}
+
+export async function uploadInspectionPhoto(file: Blob, filename: string): Promise<InspectionPhotoUploadResponse> {
+  const formData = new FormData();
+  formData.append("file", file, filename);
+
+  let response: Response;
+  try {
+    response = await fetch(`${getBackendUrl()}/inspections/photos/upload`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${getToken()}` },
+      body: formData
+    });
+  } catch {
+    throw new Error("上传失败：无法连接后端，请检查手机与服务端网络连通性。");
+  }
+
+  const contentType = response.headers.get("content-type") || "";
+  const isJson = contentType.includes("application/json");
+  const data = isJson ? await response.json() : null;
+
+  if (!response.ok) {
+    const detail = data && typeof data.detail === "string" ? data.detail : "";
+    throw new Error(detail || `上传照片失败: ${response.status}`);
+  }
+
+  if (!data) {
+    throw new Error("上传失败：后端返回格式异常。请检查服务日志。");
+  }
+
+  return data as InspectionPhotoUploadResponse;
 }
 

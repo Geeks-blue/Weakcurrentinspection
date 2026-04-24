@@ -49,6 +49,35 @@ def _list_photo_urls(request: Request, inspection_id: int, db: Session) -> list[
     return [_build_photo_url(request, photo.object_key) for photo in photos]
 
 
+def _ensure_owned_uploaded_photo(object_key: str, current_user: User, field_name: str) -> str:
+    cleaned_key = (object_key or "").strip()
+    if not cleaned_key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{field_name} is required")
+
+    user_prefix = f"{current_user.username}-"
+    if not cleaned_key.startswith(user_prefix):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{field_name} must reference a photo uploaded by current user",
+        )
+
+    file_path = UPLOAD_DIR / cleaned_key
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{field_name} does not exist on server",
+        )
+    return cleaned_key
+
+
+def _ensure_manual_door_plate_in_photo_keys(door_plate_photo_key: str, photo_keys: list[str]) -> None:
+    if door_plate_photo_key not in photo_keys:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="door_plate_photo_key must be included in photo_keys",
+        )
+
+
 @router.post("/photos/upload", response_model=InspectionPhotoUploadResponse)
 async def upload_inspection_photo(
     request: Request,
@@ -164,6 +193,26 @@ def submit_inspection(
             detail=f"Current assignment status does not allow submission: {assignment.status}",
         )
 
+    if payload.checkin_mode == "manual":
+        manual_room_code = (payload.manual_room_code or "").strip()
+        if manual_room_code.lower() != room.room_code.lower():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="manual_room_code does not match assigned room",
+            )
+        door_plate_photo_key = _ensure_owned_uploaded_photo(
+            payload.door_plate_photo_key or "",
+            current_user,
+            "door_plate_photo_key",
+        )
+        _ensure_manual_door_plate_in_photo_keys(door_plate_photo_key, payload.photo_keys)
+        payload.door_plate_photo_key = door_plate_photo_key
+
+    payload.photo_keys = [
+        _ensure_owned_uploaded_photo(photo_key, current_user, "photo_keys")
+        for photo_key in payload.photo_keys
+    ]
+
     inspection = Inspection(
         assignment_id=assignment.id,
         room_id=room.id,
@@ -202,6 +251,8 @@ def my_inspections(
     request: Request,
     status_filter: str | None = Query(default=None, alias="status"),
     room_code: str | None = Query(default=None),
+    submitted_from: datetime | None = Query(default=None, alias="submitted_from"),
+    submitted_to: datetime | None = Query(default=None, alias="submitted_to"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[InspectionItem]:
@@ -221,6 +272,12 @@ def my_inspections(
 
     if room_code:
         query = query.filter(Room.room_code.ilike(f"%{room_code.strip()}%"))
+
+    if submitted_from:
+        query = query.filter(Inspection.submitted_at >= submitted_from)
+
+    if submitted_to:
+        query = query.filter(Inspection.submitted_at <= submitted_to)
 
     rows = query.all()
     result: list[InspectionItem] = []

@@ -55,10 +55,15 @@ const submitMessage = ref("");
 const submitError = ref("");
 const myInspections = ref<MyInspectionItem[]>([]);
 const previewPhotoUrl = ref("");
+const inspectionFilterStatus = ref("");
+const inspectionFilterRoomCode = ref("");
+const inspectionFilterFrom = ref("");
+const inspectionFilterTo = ref("");
 
 const photoKeys = computed(() =>
   capturedPhotos.value.map((item) => item.key)
 );
+const doorPlatePhotoOptions = computed(() => capturedPhotos.value.map((item) => item.key));
 
 const isStudentLoggedIn = computed(() => currentRole.value === "student" && Boolean(getToken()));
 
@@ -252,6 +257,9 @@ async function handleCameraInput(event: Event): Promise<void> {
         createdAt: now.toISOString()
       }
     ];
+    if (checkinMode.value === "manual" && !doorPlatePhotoKey.value) {
+      doorPlatePhotoKey.value = uploaded.key;
+    }
     photoStatus.value = `已拍摄 ${capturedPhotos.value.length} 张`;
   } catch (error) {
     photoError.value = error instanceof Error ? error.message : "拍照处理失败";
@@ -261,7 +269,11 @@ async function handleCameraInput(event: Event): Promise<void> {
 }
 
 function removePhoto(photoId: string): void {
+  const target = capturedPhotos.value.find((item) => item.id === photoId);
   capturedPhotos.value = capturedPhotos.value.filter((item) => item.id !== photoId);
+  if (target && doorPlatePhotoKey.value === target.key) {
+    doorPlatePhotoKey.value = "";
+  }
   photoStatus.value = capturedPhotos.value.length ? `已拍摄 ${capturedPhotos.value.length} 张` : "未拍照";
 }
 
@@ -269,6 +281,7 @@ function clearPhotos(): void {
   capturedPhotos.value = [];
   photoStatus.value = "未拍照";
   photoError.value = "";
+  doorPlatePhotoKey.value = "";
 }
 
 function openPhotoPreview(url: string): void {
@@ -369,9 +382,26 @@ async function refreshTasks(): Promise<void> {
   }
 }
 
+function normalizeDateTimeLocal(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+  const date = new Date(trimmed);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return date.toISOString();
+}
+
 async function refreshInspections(): Promise<void> {
   try {
-    myInspections.value = await loadMyInspections();
+    myInspections.value = await loadMyInspections({
+      status: inspectionFilterStatus.value.trim() || undefined,
+      room_code: inspectionFilterRoomCode.value.trim() || undefined,
+      submitted_from: normalizeDateTimeLocal(inspectionFilterFrom.value) || undefined,
+      submitted_to: normalizeDateTimeLocal(inspectionFilterTo.value) || undefined
+    });
   } catch (error) {
     submitError.value = error instanceof Error ? error.message : "获取记录失败";
   }
@@ -573,8 +603,13 @@ onMounted(async () => {
         <template v-if="checkinMode === 'manual'">
           <label>手动房间编号</label>
           <input v-model="manualRoomCode" placeholder="dorm-2-R1" />
-          <label>门牌照片 Key</label>
-          <input v-model="doorPlatePhotoKey" placeholder="door-plate-1.jpg" />
+          <label>门牌照片</label>
+          <select v-model="doorPlatePhotoKey">
+            <option value="">请选择门牌照片</option>
+            <option v-for="photoKey in doorPlatePhotoOptions" :key="photoKey" :value="photoKey">
+              {{ photoKey }}
+            </option>
+          </select>
         </template>
 
         <label>锁闭状态</label>
@@ -619,7 +654,35 @@ onMounted(async () => {
 
       <section class="card">
         <h2>我的巡检记录</h2>
-        <button class="ghost" @click="refreshInspections">刷新记录</button>
+        <label>状态筛选</label>
+        <select v-model="inspectionFilterStatus">
+          <option value="">全部状态</option>
+          <option value="pending_review">待审核</option>
+          <option value="approved">已通过</option>
+          <option value="rejected">已驳回</option>
+          <option value="rectify_required">需整改</option>
+        </select>
+        <label>弱电间编号</label>
+        <input v-model="inspectionFilterRoomCode" placeholder="如 dorm-2-R1" />
+        <label>开始时间</label>
+        <input v-model="inspectionFilterFrom" type="datetime-local" />
+        <label>结束时间</label>
+        <input v-model="inspectionFilterTo" type="datetime-local" />
+        <div class="row">
+          <button class="ghost" @click="refreshInspections">按条件筛选</button>
+          <button
+            class="ghost"
+            @click="
+              inspectionFilterStatus = '';
+              inspectionFilterRoomCode = '';
+              inspectionFilterFrom = '';
+              inspectionFilterTo = '';
+              refreshInspections();
+            "
+          >
+            清空筛选
+          </button>
+        </div>
         <ul class="list">
           <li v-for="item in myInspections" :key="item.inspection_id">
             <strong>ID {{ item.inspection_id }}</strong>

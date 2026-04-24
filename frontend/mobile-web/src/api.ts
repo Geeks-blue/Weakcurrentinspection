@@ -60,6 +60,13 @@ export interface MyInspectionItem {
   photo_urls: string[];
 }
 
+export interface InspectionQueryFilters {
+  status?: string;
+  room_code?: string;
+  submitted_from?: string;
+  submitted_to?: string;
+}
+
 export interface InspectionPhotoUploadResponse {
   object_key: string;
   file_url: string;
@@ -133,8 +140,24 @@ export async function submitInspection(payload: SubmitPayload): Promise<SubmitRe
   return data as SubmitResponse;
 }
 
-export async function loadMyInspections(): Promise<MyInspectionItem[]> {
-  const response = await fetch(`${getBackendUrl()}/inspections/my`, {
+export async function loadMyInspections(filters?: InspectionQueryFilters): Promise<MyInspectionItem[]> {
+  const params = new URLSearchParams();
+  if (filters?.status) {
+    params.set("status", filters.status);
+  }
+  if (filters?.room_code) {
+    params.set("room_code", filters.room_code);
+  }
+  if (filters?.submitted_from) {
+    params.set("submitted_from", filters.submitted_from);
+  }
+  if (filters?.submitted_to) {
+    params.set("submitted_to", filters.submitted_to);
+  }
+  const query = params.toString();
+  const url = `${getBackendUrl()}/inspections/my${query ? `?${query}` : ""}`;
+
+  const response = await fetch(url, {
     headers: { Authorization: `Bearer ${getToken()}` }
   });
   if (!response.ok) {

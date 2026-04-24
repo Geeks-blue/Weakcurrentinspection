@@ -180,6 +180,17 @@ button.tab-btn.active {
   border-color: color-mix(in srgb, var(--primary) 72%, #12398a 28%);
 }
 
+.sub-tab-btn {
+  margin-left: 12px;
+  font-size: 0.88rem;
+  border-left: 2px solid var(--line) !important;
+  border-radius: 8px !important;
+}
+
+.sub-tab-btn.active {
+  border-left-color: var(--primary) !important;
+}
+
 .status-pill {
   margin-left: auto;
   display: inline-flex;

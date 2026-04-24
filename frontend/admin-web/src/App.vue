@@ -51,6 +51,7 @@ import type {
 } from "./types";
 
 type ConsolePage = "workspace" | "settings";
+type WorkspaceSub = "inspection" | "assets";
 type ViewHash = ConsolePage | "login";
 
 const username = ref("teacher01");
@@ -126,6 +127,7 @@ const aiResult = ref("");
 const aiError = ref("");
 const aiRaw = ref("");
 const activePage = ref<ConsolePage>("workspace");
+const workspaceSub = ref<WorkspaceSub>("inspection");
 const previewPhotoUrl = ref("");
 const sidebarCollapsed = ref(false);
 const isLoggedIn = computed(() => Boolean(currentUser.value && getAccessToken()));
@@ -150,6 +152,10 @@ const editingAssetId = ref<number | null>(null);
 const showQrcodeDialog = ref(false);
 const qrcodeUrl = ref("");
 const qrcodeTitle = ref("");
+const showRoomActionDialog = ref(false);
+const actionRoom = ref<AssetRoomItem | null>(null);
+const showAssetActionDialog = ref(false);
+const actionAsset = ref<AssetItemView | null>(null);
 
 function openRoomDialog(room?: AssetRoomItem) {
   if (room) {
@@ -257,6 +263,52 @@ function closeQrcodeDialog() {
   qrcodeTitle.value = "";
 }
 
+function openRoomActionDialog(room: AssetRoomItem): void {
+  actionRoom.value = room;
+  showRoomActionDialog.value = true;
+}
+
+function roomActionEdit(): void {
+  const room = actionRoom.value;
+  showRoomActionDialog.value = false;
+  if (room) openRoomDialog(room);
+}
+
+function roomActionQrcode(): void {
+  const room = actionRoom.value;
+  showRoomActionDialog.value = false;
+  if (room) handleShowRoomQrcode(room);
+}
+
+function roomActionDelete(): void {
+  const room = actionRoom.value;
+  showRoomActionDialog.value = false;
+  if (room) handleDeleteRoom(room.room_id);
+}
+
+function openAssetActionDialog(asset: AssetItemView): void {
+  actionAsset.value = asset;
+  showAssetActionDialog.value = true;
+}
+
+function assetActionEdit(): void {
+  const asset = actionAsset.value;
+  showAssetActionDialog.value = false;
+  if (asset) openAssetDialog(asset);
+}
+
+function assetActionQrcode(): void {
+  const asset = actionAsset.value;
+  showAssetActionDialog.value = false;
+  if (asset) handleShowAssetQrcode(asset);
+}
+
+function assetActionDelete(): void {
+  const asset = actionAsset.value;
+  showAssetActionDialog.value = false;
+  if (asset) handleDeleteAsset(asset.asset_id);
+}
+
 function buildDefaultDueAt(): string {
   // 将默认截止时间设置为当前时间 +24 小时，并转换为 datetime-local 可直接绑定格式。
   const due = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -311,6 +363,10 @@ function setViewHash(view: ViewHash): void {
 function switchConsolePage(page: ConsolePage): void {
   activePage.value = page;
   setViewHash(page);
+}
+
+function switchWorkspaceSub(sub: WorkspaceSub): void {
+  workspaceSub.value = sub;
 }
 
 function toggleSidebar(): void {
@@ -987,6 +1043,22 @@ onMounted(async () => {
         <button class="ghost tab-btn" :class="{ active: activePage === 'workspace' }" @click="switchConsolePage('workspace')">
           <span class="sidebar-label">{{ sidebarCollapsed ? "业" : "业务面板" }}</span>
         </button>
+        <button
+          v-if="activePage === 'workspace'"
+          class="ghost tab-btn sub-tab-btn"
+          :class="{ active: workspaceSub === 'inspection' }"
+          @click="switchWorkspaceSub('inspection')"
+        >
+          <span class="sidebar-label">{{ sidebarCollapsed ? "检" : "巡检工作台" }}</span>
+        </button>
+        <button
+          v-if="activePage === 'workspace'"
+          class="ghost tab-btn sub-tab-btn"
+          :class="{ active: workspaceSub === 'assets' }"
+          @click="switchWorkspaceSub('assets')"
+        >
+          <span class="sidebar-label">{{ sidebarCollapsed ? "产" : "资产管理" }}</span>
+        </button>
         <button class="ghost tab-btn" :class="{ active: activePage === 'settings' }" @click="switchConsolePage('settings')">
           <span class="sidebar-label">{{ sidebarCollapsed ? "设" : "系统设置" }}</span>
         </button>
@@ -1083,7 +1155,7 @@ onMounted(async () => {
       </template>
 
       <template v-else>
-        <section class="panel" v-if="isAdmin">
+        <section class="panel" v-if="isAdmin && workspaceSub === 'inspection'">
           <h2>管理员账号注册</h2>
           <p class="hint">该面板仅管理员可见，用于新增学生、教师、运维和管理员账号。</p>
           <div class="grid">
@@ -1127,7 +1199,7 @@ onMounted(async () => {
           <p class="hint" v-if="registerMessage">{{ registerMessage }}</p>
         </section>
 
-        <section class="panel" v-if="isReviewer">
+        <section class="panel" v-if="isReviewer && workspaceSub === 'inspection'">
           <h2>教师任务派遣</h2>
           <p class="hint">教师和管理员都可派单，系统会按宿舍楼策略校验是否允许派发。</p>
           <div class="actions">
@@ -1178,7 +1250,7 @@ onMounted(async () => {
           <p class="error" v-if="dispatchError">{{ dispatchError }}</p>
         </section>
 
-        <section class="panel" v-if="isReviewer">
+        <section class="panel" v-if="isReviewer && workspaceSub === 'inspection'">
           <h2>待巡检任务列表</h2>
           <div class="actions">
             <button class="ghost" :disabled="pendingTasksLoading" @click="loadPendingTasks">
@@ -1282,7 +1354,7 @@ onMounted(async () => {
           </div>
         </section>
 
-        <section class="panel" v-if="isReviewer">
+        <section class="panel" v-if="isReviewer && workspaceSub === 'assets'">
           <h2>资产管理（房间与资产表格导入）</h2>
           <p class="hint">支持 CSV / XLSX。房间导入字段：building_code, room_code, floor_label, location_text, is_active。资产导入字段：asset_code, asset_name, room_code, quantity, asset_category, status, manufacturer, model, note。</p>
           <input ref="roomsImportInput" class="file-input-hidden" type="file" accept=".csv,.xlsx" @change="onRoomsImportChange" />
@@ -1321,11 +1393,7 @@ onMounted(async () => {
                       <td>{{ room.location_text || "-" }}</td>
                       <td>{{ room.is_active ? "启用" : "禁用" }}</td>
                       <td>
-                        <div class="table-action-group">
-                          <button class="ghost btn-sm" @click="openRoomDialog(room)">编辑</button>
-                          <button class="ghost btn-sm" @click="handleShowRoomQrcode(room)">二维码</button>
-                          <button class="danger btn-sm" @click="handleDeleteRoom(room.room_id)">删除</button>
-                        </div>
+                        <button class="ghost btn-sm" @click="openRoomActionDialog(room)">操作</button>
                       </td>
                     </tr>
                   </tbody>
@@ -1355,11 +1423,7 @@ onMounted(async () => {
                       <td>{{ asset.quantity }}</td>
                       <td>{{ formatAssetStatus(asset.status) }}</td>
                       <td>
-                        <div class="table-action-group">
-                          <button class="ghost btn-sm" @click="openAssetDialog(asset)">编辑</button>
-                          <button class="ghost btn-sm" @click="handleShowAssetQrcode(asset)">二维码</button>
-                          <button class="danger btn-sm" @click="handleDeleteAsset(asset.asset_id)">删除</button>
-                        </div>
+                        <button class="ghost btn-sm" @click="openAssetActionDialog(asset)">操作</button>
                       </td>
                     </tr>
                   </tbody>
@@ -1369,7 +1433,7 @@ onMounted(async () => {
           </div>
         </section>
 
-        <section class="panel" v-if="isReviewer">
+        <section class="panel" v-if="isReviewer && workspaceSub === 'inspection'">
           <h2>巡检审核中心</h2>
           <div class="actions">
             <button :disabled="pendingLoading" @click="loadPendingReviews">
@@ -1429,7 +1493,7 @@ onMounted(async () => {
           <p class="hint" v-if="reviewMessage">{{ reviewMessage }}</p>
         </section>
 
-        <section class="panel" v-if="isReviewer">
+        <section class="panel" v-if="isReviewer && workspaceSub === 'inspection'">
           <h2>巡检记录总览（控制台）</h2>
           <div class="actions">
             <button class="ghost" :disabled="consoleLoading" @click="loadConsoleInspections">
@@ -1495,6 +1559,38 @@ onMounted(async () => {
     <div class="photo-lightbox" v-if="previewPhotoUrl" @click.self="closePhotoPreview">
       <button class="photo-lightbox-close" @click="closePhotoPreview">关闭</button>
       <img :src="previewPhotoUrl" alt="巡检照片预览" />
+    </div>
+
+    <!-- 房间操作弹窗 -->
+    <div v-if="showRoomActionDialog && actionRoom" class="dialog-mask" @click.self="showRoomActionDialog = false">
+      <div class="dialog-panel">
+        <h3>房间操作</h3>
+        <p class="hint">{{ actionRoom.building_code }} / {{ actionRoom.room_code }}（{{ actionRoom.floor_label || "—" }}）{{ actionRoom.is_active ? "启用" : "禁用" }}</p>
+        <div class="action-dialog-btns">
+          <button @click="roomActionEdit">✏️ 编辑房间信息</button>
+          <button class="ghost" @click="roomActionQrcode">🔲 查看 / 下载二维码</button>
+          <button class="danger" @click="roomActionDelete">🗑 删除房间</button>
+        </div>
+        <div class="actions">
+          <button class="ghost" @click="showRoomActionDialog = false">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 资产操作弹窗 -->
+    <div v-if="showAssetActionDialog && actionAsset" class="dialog-mask" @click.self="showAssetActionDialog = false">
+      <div class="dialog-panel">
+        <h3>资产操作</h3>
+        <p class="hint">{{ actionAsset.asset_code }} · {{ actionAsset.asset_name }}（{{ formatAssetStatus(actionAsset.status) }}）</p>
+        <div class="action-dialog-btns">
+          <button @click="assetActionEdit">✏️ 编辑资产信息</button>
+          <button class="ghost" @click="assetActionQrcode">🔲 查看 / 下载二维码</button>
+          <button class="danger" @click="assetActionDelete">🗑 删除资产</button>
+        </div>
+        <div class="actions">
+          <button class="ghost" @click="showAssetActionDialog = false">关闭</button>
+        </div>
+      </div>
     </div>
 
     <!-- 房间编辑弹窗 -->

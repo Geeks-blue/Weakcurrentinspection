@@ -382,6 +382,32 @@ function formatAssetMatchState(value: string): string {
   return labels[value] || value;
 }
 
+function formatStatus(value: string): string {
+  const labels: Record<string, string> = {
+    todo: "待巡检",
+    pending_review: "待审核",
+    approved: "已通过",
+    rejected: "已驳回",
+    rectify_required: "需整改",
+    overdue: "已逾期"
+  };
+  return labels[value] || value;
+}
+
+function statusClass(value: string): string {
+  return `status-${value.replace(/_/g, "-")}`;
+}
+
+function formatAssetStatus(value: string): string {
+  const labels: Record<string, string> = {
+    in_use: "使用中",
+    idle: "闲置",
+    maintenance: "维修中",
+    scrapped: "已报废"
+  };
+  return labels[value] || value;
+}
+
 function openPhotoPreview(url: string): void {
   previewPhotoUrl.value = url;
 }
@@ -956,7 +982,7 @@ onMounted(async () => {
     <template v-else>
       <nav class="view-switch" :class="{ collapsed: sidebarCollapsed }">
         <button class="ghost tab-btn sidebar-toggle-btn" @click="toggleSidebar">
-          {{ sidebarCollapsed ? ">>" : "<<" }}
+          {{ sidebarCollapsed ? "展开 »" : "« 收起" }}
         </button>
         <button class="ghost tab-btn" :class="{ active: activePage === 'workspace' }" @click="switchConsolePage('workspace')">
           <span class="sidebar-label">{{ sidebarCollapsed ? "业" : "业务面板" }}</span>
@@ -1057,11 +1083,6 @@ onMounted(async () => {
       </template>
 
       <template v-else>
-        <section class="panel" v-if="isReviewer">
-          <h2>管理台角色验证</h2>
-          <p class="hint">当前账号已通过角色校验，可访问教师/管理员巡检功能。</p>
-        </section>
-
         <section class="panel" v-if="isAdmin">
           <h2>管理员账号注册</h2>
           <p class="hint">该面板仅管理员可见，用于新增学生、教师、运维和管理员账号。</p>
@@ -1173,7 +1194,7 @@ onMounted(async () => {
                 <li v-for="task in pendingTasks" :key="task.assignment_id">
                   <div class="record-head">
                     <strong>ID {{ task.assignment_id }} / {{ task.student_username }}</strong>
-                    <span class="record-status">{{ task.status }}</span>
+                    <span class="record-status" :class="statusClass(task.status)">{{ formatStatus(task.status) }}</span>
                   </div>
                   <div class="record-meta-grid">
                     <span>标题：{{ task.task_title }}</span>
@@ -1269,8 +1290,10 @@ onMounted(async () => {
 
           <div class="actions">
             <button class="ghost" :disabled="assetLoading" @click="loadAssetData">{{ assetLoading ? "加载中..." : "刷新资产数据" }}</button>
-            <button :disabled="importingRooms" @click="triggerRoomsImport">{{ importingRooms ? "导入中..." : "导入房间表" }}</button>
-            <button :disabled="importingAssets" @click="triggerAssetsImport">{{ importingAssets ? "导入中..." : "导入资产表" }}</button>
+            <button @click="openRoomDialog()">新增房间</button>
+            <button @click="openAssetDialog()">新增资产</button>
+            <button class="ghost" :disabled="importingRooms" @click="triggerRoomsImport">{{ importingRooms ? "导入中..." : "导入房间表" }}</button>
+            <button class="ghost" :disabled="importingAssets" @click="triggerAssetsImport">{{ importingAssets ? "导入中..." : "导入资产表" }}</button>
           </div>
           <p class="hint" v-if="assetMessage">{{ assetMessage }}</p>
           <p class="error" v-if="assetError">{{ assetError }}</p>
@@ -1287,6 +1310,7 @@ onMounted(async () => {
                       <th>楼层</th>
                       <th>位置</th>
                       <th>状态</th>
+                      <th>操作</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1296,6 +1320,13 @@ onMounted(async () => {
                       <td>{{ room.floor_label || "-" }}</td>
                       <td>{{ room.location_text || "-" }}</td>
                       <td>{{ room.is_active ? "启用" : "禁用" }}</td>
+                      <td>
+                        <div class="table-action-group">
+                          <button class="ghost btn-sm" @click="openRoomDialog(room)">编辑</button>
+                          <button class="ghost btn-sm" @click="handleShowRoomQrcode(room)">二维码</button>
+                          <button class="danger btn-sm" @click="handleDeleteRoom(room.room_id)">删除</button>
+                        </div>
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -1313,6 +1344,7 @@ onMounted(async () => {
                       <th>位置</th>
                       <th>数量</th>
                       <th>状态</th>
+                      <th>操作</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1321,7 +1353,14 @@ onMounted(async () => {
                       <td>{{ asset.asset_name }}</td>
                       <td>{{ asset.building_code }} / {{ asset.room_code }}</td>
                       <td>{{ asset.quantity }}</td>
-                      <td>{{ asset.status }}</td>
+                      <td>{{ formatAssetStatus(asset.status) }}</td>
+                      <td>
+                        <div class="table-action-group">
+                          <button class="ghost btn-sm" @click="openAssetDialog(asset)">编辑</button>
+                          <button class="ghost btn-sm" @click="handleShowAssetQrcode(asset)">二维码</button>
+                          <button class="danger btn-sm" @click="handleDeleteAsset(asset.asset_id)">删除</button>
+                        </div>
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -1403,7 +1442,7 @@ onMounted(async () => {
             <li v-for="item in consoleInspections" :key="item.inspection_id">
               <div class="record-head">
                 <strong>ID {{ item.inspection_id }} / {{ item.student_username }}</strong>
-                <span class="record-status">{{ item.status }}</span>
+                <span class="record-status" :class="statusClass(item.status)">{{ formatStatus(item.status) }}</span>
               </div>
               <div class="record-meta-grid">
                 <span>{{ item.building_code }} / {{ item.room_code }}</span>

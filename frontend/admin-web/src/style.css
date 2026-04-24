@@ -372,6 +372,25 @@ button.danger {
   font-weight: 700;
 }
 
+.record-status.status-todo { background: #edf4ff; color: #1e4f9f; border-color: #b8cfff; }
+.record-status.status-pending-review { background: #fffbe6; color: #874d00; border-color: #ffe58f; }
+.record-status.status-approved { background: #f6ffed; color: #237804; border-color: #b7eb8f; }
+.record-status.status-rejected { background: #fff1f0; color: #a8071a; border-color: #ffa39e; }
+.record-status.status-rectify-required { background: #fff7e6; color: #873800; border-color: #ffd591; }
+.record-status.status-overdue { background: #fff2e8; color: #873800; border-color: #ffbb96; }
+
+.table-action-group {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.btn-sm {
+  padding: 3px 10px;
+  font-size: 0.8rem;
+  border-radius: 7px;
+}
+
 .record-meta-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

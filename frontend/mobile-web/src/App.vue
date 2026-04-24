@@ -307,6 +307,22 @@ function formatRole(role: string): string {
   return labels[role] || role;
 }
 
+function formatStatus(value: string): string {
+  const labels: Record<string, string> = {
+    todo: "待巡检",
+    pending_review: "待审核",
+    approved: "已通过",
+    rejected: "已驳回",
+    rectify_required: "需整改",
+    overdue: "已逾期"
+  };
+  return labels[value] || value;
+}
+
+function statusClass(value: string): string {
+  return `status-${value.replace(/_/g, "-")}`;
+}
+
 function consumePortalParams(): void {
   const query = new URLSearchParams(window.location.search);
   const tokenFromPortal = (query.get("token") || "").trim();
@@ -534,7 +550,7 @@ onMounted(async () => {
           >
             <strong>{{ task.task_title }}</strong>
             <span>{{ task.building_code }} / {{ task.room_code }}</span>
-            <span>状态：{{ task.status }}</span>
+            <span class="task-status-badge" :class="statusClass(task.status)">{{ formatStatus(task.status) }}</span>
             <span>截止：{{ new Date(task.due_at).toLocaleString() }}</span>
           </button>
         </div>
@@ -580,7 +596,6 @@ onMounted(async () => {
             <div class="photo-item-meta">
               <strong>第 {{ index + 1 }} 张</strong>
               <span>{{ new Date(photo.createdAt).toLocaleString() }}</span>
-              <span>{{ photo.key }}</span>
             </div>
             <button class="ghost photo-item-remove" @click="removePhoto(photo.id)">删除</button>
           </article>
@@ -687,7 +702,10 @@ onMounted(async () => {
           <li v-for="item in myInspections" :key="item.inspection_id">
             <strong>ID {{ item.inspection_id }}</strong>
             <span>{{ item.building_code }} / {{ item.room_code }}</span>
-            <span>状态：{{ item.status }}，照片：{{ item.photo_count }}</span>
+            <div class="insp-meta-row">
+              <span class="insp-status-badge" :class="statusClass(item.status)">{{ formatStatus(item.status) }}</span>
+              <span>照片：{{ item.photo_count }}</span>
+            </div>
             <div class="history-photo-grid" v-if="item.photo_urls.length > 0">
               <img
                 v-for="photoUrl in item.photo_urls"

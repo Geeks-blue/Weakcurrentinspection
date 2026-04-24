@@ -1,8 +1,17 @@
 from datetime import datetime
-from fastapi import Body
-# 签到记录表模型（如无则临时定义在此，建议后续迁移到 models/entities.py）
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
-from sqlalchemy.orm import declarative_base
+from io import BytesIO, StringIO
+
+import qrcode
+from fastapi import APIRouter, Body, Depends, File, HTTPException, Response, UploadFile, status
+from openpyxl import load_workbook
+from sqlalchemy import Column, DateTime, Integer, String
+from sqlalchemy.orm import Session, declarative_base
+
+from app.deps import get_db, require_teacher_or_admin
+from app.models.entities import Asset, Building, Room, User
+from app.schemas.assets import AssetItemView, AssetRoomItem, ImportSummary
+
+router = APIRouter()
 BaseTmp = declarative_base()
 
 class RoomSignLog(BaseTmp):
@@ -43,17 +52,6 @@ def sign_asset(asset_id: int, db: Session = Depends(get_db), user: User = Depend
     db.add(log)
     db.commit()
     return {"ok": True, "sign_time": log.sign_time}
-# 文件说明：该文件为弱电巡检系统源码，已按中文注释规范维护。
-from io import BytesIO, StringIO
-
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status, Response
-from openpyxl import load_workbook
-from sqlalchemy.orm import Session
-
-from app.deps import get_db, require_teacher_or_admin
-from app.models.entities import Asset, Building, Room, User
-import qrcode
-from io import BytesIO
 @router.post("/room", response_model=AssetRoomItem)
 def create_room(item: AssetRoomItem, db: Session = Depends(get_db), _: User = Depends(require_teacher_or_admin)):
     building = db.query(Building).filter(Building.code == item.building_code).first()
@@ -219,11 +217,6 @@ def get_asset_qrcode(asset_id: int, db: Session = Depends(get_db)):
     img.save(buf, format="PNG")
     buf.seek(0)
     return Response(content=buf.read(), media_type="image/png")
-from app.schemas.assets import AssetItemView, AssetRoomItem, ImportSummary
-
-router = APIRouter()
-
-
 def _parse_table_file(file: UploadFile) -> list[dict[str, str]]:
     content = file.file.read()
     if not content:

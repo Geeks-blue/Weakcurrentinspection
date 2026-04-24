@@ -127,6 +127,17 @@ const aiError = ref("");
 const aiRaw = ref("");
 const activePage = ref<ConsolePage>("workspace");
 const previewPhotoUrl = ref("");
+const isLoggedIn = computed(() => Boolean(currentUser.value && getAccessToken()));
+const isReviewer = computed(() =>
+  Boolean(currentUser.value && canEnterAdminConsole(currentUser.value.role))
+);
+const isAdmin = computed(() => currentUser.value?.role === "admin");
+const userStatusText = computed(() => {
+  if (!currentUser.value) {
+    return "未登录";
+  }
+  return `已登录：${currentUser.value.username}（${formatRole(currentUser.value.role)}）`;
+});
 
 // 房间/资产编辑弹窗状态
 const showRoomDialog = ref(false);

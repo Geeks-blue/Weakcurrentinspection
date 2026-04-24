@@ -51,6 +51,12 @@ const photoStatus = ref("未拍照");
 const photoError = ref("");
 const photoBusy = ref(false);
 
+const qrScanInput = ref<HTMLInputElement | null>(null);
+const qrScanResult = ref("");
+const qrScanError = ref("");
+const qrScanBusy = ref(false);
+const hasBarcodeDetector = "BarcodeDetector" in window;
+
 const submitMessage = ref("");
 const submitError = ref("");
 const myInspections = ref<MyInspectionItem[]>([]);
@@ -74,6 +80,12 @@ const canSubmit = computed(() => {
 
   if (!lat.value.trim() || !lng.value.trim()) {
     return false;
+  }
+
+  if (checkinMode.value === "qr") {
+    if (!qrScanResult.value) {
+      return false;
+    }
   }
 
   if (checkinMode.value === "manual") {
@@ -217,6 +229,40 @@ async function uploadWatermarkedPhoto(dataUrl: string, filename: string): Promis
 function openCameraPicker(): void {
   photoError.value = "";
   cameraInput.value?.click();
+}
+
+function openQrScanner(): void {
+  qrScanError.value = "";
+  qrScanInput.value?.click();
+}
+
+async function handleQrScanInput(event: Event): Promise<void> {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  target.value = "";
+  if (!file) return;
+
+  qrScanBusy.value = true;
+  qrScanError.value = "";
+  qrScanResult.value = "";
+
+  try {
+    const detector = new (window as any).BarcodeDetector({ formats: ["qr_code"] });
+    const bitmap = await createImageBitmap(file);
+    const barcodes = await detector.detect(bitmap);
+    if (barcodes.length === 0) {
+      qrScanError.value = "未识别到二维码，请重新拍摄";
+      return;
+    }
+    const rawValue: string = barcodes[0].rawValue;
+    const roomCode = rawValue.startsWith("QR-") ? rawValue.slice(3) : rawValue;
+    qrScanResult.value = roomCode;
+    manualRoomCode.value = roomCode;
+  } catch (err) {
+    qrScanError.value = err instanceof Error ? err.message : "二维码识别失败";
+  } finally {
+    qrScanBusy.value = false;
+  }
 }
 
 async function handleCameraInput(event: Event): Promise<void> {
@@ -609,6 +655,22 @@ onMounted(async () => {
           <option value="qr">扫码签到</option>
           <option value="manual">手动补录</option>
         </select>
+
+        <template v-if="checkinMode === 'qr'">
+          <input ref="qrScanInput" class="camera-input" type="file" accept="image/*" capture="camera" @change="handleQrScanInput" />
+          <div class="qr-scan-area">
+            <template v-if="hasBarcodeDetector">
+              <button :disabled="qrScanBusy" @click="openQrScanner">
+                {{ qrScanBusy ? "识别中..." : "📷 扫描房间二维码" }}
+              </button>
+              <div class="qr-scanned-badge" v-if="qrScanResult">✅ 已扫描：{{ qrScanResult }}</div>
+              <p class="error" v-if="qrScanError">{{ qrScanError }}</p>
+            </template>
+            <template v-else>
+              <p class="hint qr-fallback-hint">当前浏览器不支持自动识别，请切换为"手动补录"方式。</p>
+            </template>
+          </div>
+        </template>
 
         <label>定位纬度</label>
         <input v-model="lat" placeholder="23.123456" />

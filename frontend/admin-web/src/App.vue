@@ -95,6 +95,19 @@ const importingRooms = ref(false);
 const importingAssets = ref(false);
 const roomsImportInput = ref<HTMLInputElement | null>(null);
 const assetsImportInput = ref<HTMLInputElement | null>(null);
+const selectedRoomCode = ref("");
+
+const roomAssetCount = computed(() => {
+  const counts: Record<string, number> = {};
+  for (const asset of assets.value) {
+    counts[asset.room_code] = (counts[asset.room_code] || 0) + 1;
+  }
+  return counts;
+});
+
+const filteredAssets = computed(() =>
+  selectedRoomCode.value ? assets.value.filter((a) => a.room_code === selectedRoomCode.value) : assets.value
+);
 
 const pendingTasks = ref<PendingTaskManageItem[]>([]);
 const pendingTasksLoading = ref(false);
@@ -1396,18 +1409,26 @@ onMounted(async () => {
                       <th>楼层</th>
                       <th>位置</th>
                       <th>状态</th>
+                      <th>资产数</th>
                       <th>操作</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="room in assetRooms.slice(0, 120)" :key="room.room_id">
+                    <tr
+                      v-for="room in assetRooms.slice(0, 120)"
+                      :key="room.room_id"
+                      class="room-row"
+                      :class="{ 'room-row-selected': selectedRoomCode === room.room_code }"
+                      @click="selectedRoomCode = selectedRoomCode === room.room_code ? '' : room.room_code"
+                    >
                       <td>{{ room.building_code }}</td>
                       <td>{{ room.room_code }}</td>
                       <td>{{ room.floor_label || "-" }}</td>
                       <td>{{ room.location_text || "-" }}</td>
                       <td>{{ room.is_active ? "启用" : "禁用" }}</td>
+                      <td><span class="asset-count-badge">{{ roomAssetCount[room.room_code] || 0 }} 件</span></td>
                       <td>
-                        <button class="ghost btn-sm" @click="openRoomActionDialog(room)">操作</button>
+                        <button class="ghost btn-sm" @click.stop="openRoomActionDialog(room)">操作</button>
                       </td>
                     </tr>
                   </tbody>
@@ -1416,7 +1437,13 @@ onMounted(async () => {
             </div>
 
             <div class="table-card">
-              <h3>资产台账（{{ assets.length }}）</h3>
+              <h3>
+                资产台账（{{ filteredAssets.length }}<template v-if="selectedRoomCode"> / {{ assets.length }}</template>）
+                <template v-if="selectedRoomCode">
+                  <span class="room-filter-badge">{{ selectedRoomCode }}</span>
+                  <button class="ghost btn-sm" style="margin-left:6px" @click="selectedRoomCode = ''">✕ 清除筛选</button>
+                </template>
+              </h3>
               <div class="table-wrap">
                 <table class="data-table">
                   <thead>
@@ -1430,7 +1457,7 @@ onMounted(async () => {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="asset in assets.slice(0, 200)" :key="asset.asset_id">
+                    <tr v-for="asset in filteredAssets.slice(0, 200)" :key="asset.asset_id">
                       <td>{{ asset.asset_code }}</td>
                       <td>{{ asset.asset_name }}</td>
                       <td>{{ asset.building_code }} / {{ asset.room_code }}</td>

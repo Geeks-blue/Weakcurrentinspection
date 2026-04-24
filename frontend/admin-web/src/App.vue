@@ -127,6 +127,7 @@ const aiError = ref("");
 const aiRaw = ref("");
 const activePage = ref<ConsolePage>("workspace");
 const previewPhotoUrl = ref("");
+const sidebarCollapsed = ref(false);
 const isLoggedIn = computed(() => Boolean(currentUser.value && getAccessToken()));
 const isReviewer = computed(() =>
   Boolean(currentUser.value && canEnterAdminConsole(currentUser.value.role))
@@ -310,6 +311,10 @@ function setViewHash(view: ViewHash): void {
 function switchConsolePage(page: ConsolePage): void {
   activePage.value = page;
   setViewHash(page);
+}
+
+function toggleSidebar(): void {
+  sidebarCollapsed.value = !sidebarCollapsed.value;
 }
 
 function resolvePageFromHash(): ConsolePage {
@@ -660,6 +665,7 @@ function handleLogout(): void {
   confirmDeleteInspectionId.value = null;
   deletingInspectionId.value = null;
   closePhotoPreview();
+  sidebarCollapsed.value = false;
   authMessage.value = "已退出登录。";
   setViewHash("login");
 }
@@ -902,7 +908,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="page">
+  <div class="page" :class="{ 'page-logged-in': isLoggedIn, 'sidebar-collapsed': sidebarCollapsed }">
     <header class="hero" v-if="isLoggedIn">
       <h1>弱电巡检管理台</h1>
       <p>统一登录后按角色自动分流，支持管理员注册、教师派单和巡检审核。</p>
@@ -948,15 +954,22 @@ onMounted(async () => {
     </template>
 
     <template v-else>
-      <nav class="view-switch">
+      <nav class="view-switch" :class="{ collapsed: sidebarCollapsed }">
+        <button class="ghost tab-btn sidebar-toggle-btn" @click="toggleSidebar">
+          {{ sidebarCollapsed ? ">>" : "<<" }}
+        </button>
         <button class="ghost tab-btn" :class="{ active: activePage === 'workspace' }" @click="switchConsolePage('workspace')">
-          业务面板
+          <span class="sidebar-label">{{ sidebarCollapsed ? "业" : "业务面板" }}</span>
         </button>
         <button class="ghost tab-btn" :class="{ active: activePage === 'settings' }" @click="switchConsolePage('settings')">
-          系统设置
+          <span class="sidebar-label">{{ sidebarCollapsed ? "设" : "系统设置" }}</span>
         </button>
-        <button class="ghost" @click="handleLogout">退出登录</button>
-        <span class="status-pill" :class="{ online: isLoggedIn }">{{ userStatusText }}</span>
+        <button class="ghost" @click="handleLogout">
+          <span class="sidebar-label">{{ sidebarCollapsed ? "退" : "退出登录" }}</span>
+        </button>
+        <span class="status-pill" :class="{ online: isLoggedIn }">
+          {{ sidebarCollapsed ? "在线" : userStatusText }}
+        </span>
       </nav>
 
       <template v-if="activePage === 'settings'">

@@ -55,7 +55,6 @@ const qrScanInput = ref<HTMLInputElement | null>(null);
 const qrScanResult = ref("");
 const qrScanError = ref("");
 const qrScanBusy = ref(false);
-const hasBarcodeDetector = "BarcodeDetector" in window;
 
 const submitMessage = ref("");
 const submitError = ref("");
@@ -247,14 +246,49 @@ async function handleQrScanInput(event: Event): Promise<void> {
   qrScanResult.value = "";
 
   try {
-    const detector = new (window as any).BarcodeDetector({ formats: ["qr_code"] });
-    const bitmap = await createImageBitmap(file);
-    const barcodes = await detector.detect(bitmap);
-    if (barcodes.length === 0) {
-      qrScanError.value = "未识别到二维码，请重新拍摄";
-      return;
+    let rawValue = "";
+
+    if ("BarcodeDetector" in window) {
+      const detector = new (window as any).BarcodeDetector({ formats: ["qr_code"] });
+      const bitmap = await createImageBitmap(file);
+      const barcodes = await detector.detect(bitmap);
+      if (barcodes.length > 0) {
+        rawValue = barcodes[0].rawValue;
+      }
     }
-    const rawValue: string = barcodes[0].rawValue;
+
+    if (!rawValue) {
+      const jsQR = (window as any).jsQR;
+      if (!jsQR) {
+        qrScanError.value = "二维码解析库尚未加载，请刷新页面后重试";
+        return;
+      }
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("无法创建画布");
+      const imageUrl = URL.createObjectURL(file);
+      try {
+        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const el = new Image();
+          el.onload = () => resolve(el);
+          el.onerror = () => reject(new Error("图片加载失败"));
+          el.src = imageUrl;
+        });
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        ctx.drawImage(img, 0, 0);
+      } finally {
+        URL.revokeObjectURL(imageUrl);
+      }
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const result = jsQR(imageData.data, imageData.width, imageData.height);
+      if (!result) {
+        qrScanError.value = "未识别到二维码，请重新拍摄";
+        return;
+      }
+      rawValue = result.data;
+    }
+
     const roomCode = rawValue.startsWith("QR-") ? rawValue.slice(3) : rawValue;
     qrScanResult.value = roomCode;
     manualRoomCode.value = roomCode;
@@ -659,16 +693,11 @@ onMounted(async () => {
         <template v-if="checkinMode === 'qr'">
           <input ref="qrScanInput" class="camera-input" type="file" accept="image/*" capture="camera" @change="handleQrScanInput" />
           <div class="qr-scan-area">
-            <template v-if="hasBarcodeDetector">
-              <button :disabled="qrScanBusy" @click="openQrScanner">
-                {{ qrScanBusy ? "识别中..." : "📷 扫描房间二维码" }}
-              </button>
-              <div class="qr-scanned-badge" v-if="qrScanResult">✅ 已扫描：{{ qrScanResult }}</div>
-              <p class="error" v-if="qrScanError">{{ qrScanError }}</p>
-            </template>
-            <template v-else>
-              <p class="hint qr-fallback-hint">当前浏览器不支持自动识别，请切换为"手动补录"方式。</p>
-            </template>
+            <button :disabled="qrScanBusy" @click="openQrScanner">
+              {{ qrScanBusy ? "识别中..." : "📷 扫描房间二维码" }}
+            </button>
+            <div class="qr-scanned-badge" v-if="qrScanResult">✅ 已扫描：{{ qrScanResult }}</div>
+            <p class="error" v-if="qrScanError">{{ qrScanError }}</p>
           </div>
         </template>
 

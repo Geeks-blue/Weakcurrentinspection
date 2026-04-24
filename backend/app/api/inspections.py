@@ -39,14 +39,24 @@ def _build_photo_url(request: Request, object_key: str) -> str:
     return str(request.url_for("get_inspection_photo", object_key=object_key))
 
 
-def _list_photo_urls(request: Request, inspection_id: int, db: Session) -> list[str]:
+def _photo_file_exists(object_key: str) -> bool:
+    file_path = UPLOAD_DIR / object_key
+    return file_path.exists() and file_path.is_file()
+
+
+def _list_existing_photo_keys(inspection_id: int, db: Session) -> list[str]:
     photos = (
         db.query(InspectionPhoto)
         .filter(InspectionPhoto.inspection_id == inspection_id)
         .order_by(InspectionPhoto.created_at.asc())
         .all()
     )
-    return [_build_photo_url(request, photo.object_key) for photo in photos]
+    return [photo.object_key for photo in photos if _photo_file_exists(photo.object_key)]
+
+
+def _list_photo_urls(request: Request, inspection_id: int, db: Session) -> list[str]:
+    object_keys = _list_existing_photo_keys(inspection_id, db)
+    return [_build_photo_url(request, object_key) for object_key in object_keys]
 
 
 def _ensure_owned_uploaded_photo(object_key: str, current_user: User, field_name: str) -> str:
@@ -139,11 +149,7 @@ def console_records(
 
     result: list[ConsoleInspectionItem] = []
     for inspection, room, building, inspector in rows:
-        photo_count = (
-            db.query(InspectionPhoto)
-            .filter(InspectionPhoto.inspection_id == inspection.id)
-            .count()
-        )
+        photo_count = len(_list_existing_photo_keys(inspection.id, db))
         result.append(
             ConsoleInspectionItem(
                 inspection_id=inspection.id,
@@ -288,11 +294,7 @@ def my_inspections(
         except HTTPException:
             continue
 
-        photo_count = (
-            db.query(InspectionPhoto)
-            .filter(InspectionPhoto.inspection_id == inspection.id)
-            .count()
-        )
+        photo_count = len(_list_existing_photo_keys(inspection.id, db))
 
         result.append(
             InspectionItem(
@@ -342,11 +344,7 @@ def pending_review_list(
 
     result: list[PendingReviewInspectionItem] = []
     for inspection, _, room, building, inspector in rows:
-        photo_count = (
-            db.query(InspectionPhoto)
-            .filter(InspectionPhoto.inspection_id == inspection.id)
-            .count()
-        )
+        photo_count = len(_list_existing_photo_keys(inspection.id, db))
         result.append(
             PendingReviewInspectionItem(
                 inspection_id=inspection.id,

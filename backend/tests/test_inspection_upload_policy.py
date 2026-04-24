@@ -74,3 +74,36 @@ def test_manual_door_plate_accepts_when_included() -> None:
         "student_f01-door.jpg",
         ["student_f01-door.jpg", "student_f01-b.jpg"],
     )
+
+
+def test_list_existing_photo_keys_only_returns_existing_files(tmp_path: Path) -> None:
+    class _Photo:
+        def __init__(self, key: str) -> None:
+            self.object_key = key
+
+    class _Query:
+        def __init__(self, items: list[_Photo]) -> None:
+            self._items = items
+
+        def filter(self, *_args, **_kwargs):  # noqa: ANN001
+            return self
+
+        def order_by(self, *_args, **_kwargs):  # noqa: ANN001
+            return self
+
+        def all(self) -> list[_Photo]:
+            return self._items
+
+    class _DB:
+        def query(self, *_args, **_kwargs):  # noqa: ANN001
+            return _Query([_Photo("student_f01-exists.jpg"), _Photo("student_f01-missing.jpg")])
+
+    (tmp_path / "student_f01-exists.jpg").write_bytes(b"demo")
+    original_upload_dir = inspections_api.UPLOAD_DIR
+    inspections_api.UPLOAD_DIR = tmp_path
+    try:
+        result = inspections_api._list_existing_photo_keys(inspection_id=1, db=_DB())  # type: ignore[arg-type]
+    finally:
+        inspections_api.UPLOAD_DIR = original_upload_dir
+
+    assert result == ["student_f01-exists.jpg"]

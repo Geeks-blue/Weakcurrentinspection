@@ -1440,6 +1440,11 @@ onMounted(async () => {
       </template>
     </template>
 
+    <div class="photo-lightbox" v-if="previewPhotoUrl" @click.self="closePhotoPreview">
+      <button class="photo-lightbox-close" @click="closePhotoPreview">关闭</button>
+      <img :src="previewPhotoUrl" alt="巡检照片预览" />
+    </div>
+
     <!-- 房间编辑弹窗 -->
     <div v-if="showRoomDialog" class="dialog-mask">
       <div class="dialog-panel">

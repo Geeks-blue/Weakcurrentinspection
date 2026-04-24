@@ -51,7 +51,7 @@ import type {
 } from "./types";
 
 type ConsolePage = "workspace" | "settings";
-type WorkspaceSub = "inspection" | "assets";
+type WorkspaceSub = "inspection" | "assets" | "records";
 type ViewHash = ConsolePage | "login";
 
 const username = ref("teacher01");
@@ -264,20 +264,10 @@ function closeQrcodeDialog() {
 }
 
 function openRoomActionDialog(room: AssetRoomItem): void {
+  editingRoom.value = { ...room };
+  editingRoomId.value = room.room_id;
   actionRoom.value = room;
   showRoomActionDialog.value = true;
-}
-
-function roomActionEdit(): void {
-  const room = actionRoom.value;
-  showRoomActionDialog.value = false;
-  if (room) openRoomDialog(room);
-}
-
-function roomActionQrcode(): void {
-  const room = actionRoom.value;
-  showRoomActionDialog.value = false;
-  if (room) handleShowRoomQrcode(room);
 }
 
 function roomActionDelete(): void {
@@ -287,26 +277,42 @@ function roomActionDelete(): void {
 }
 
 function openAssetActionDialog(asset: AssetItemView): void {
+  editingAsset.value = { ...asset };
+  editingAssetId.value = asset.asset_id;
   actionAsset.value = asset;
   showAssetActionDialog.value = true;
-}
-
-function assetActionEdit(): void {
-  const asset = actionAsset.value;
-  showAssetActionDialog.value = false;
-  if (asset) openAssetDialog(asset);
-}
-
-function assetActionQrcode(): void {
-  const asset = actionAsset.value;
-  showAssetActionDialog.value = false;
-  if (asset) handleShowAssetQrcode(asset);
 }
 
 function assetActionDelete(): void {
   const asset = actionAsset.value;
   showAssetActionDialog.value = false;
   if (asset) handleDeleteAsset(asset.asset_id);
+}
+
+async function submitRoomActionEdit(): Promise<void> {
+  if (!editingRoomId.value || !editingRoom.value) return;
+  try {
+    await updateRoom(editingRoomId.value, editingRoom.value);
+    assetMessage.value = "房间修改成功";
+    await loadAssetData();
+    showRoomActionDialog.value = false;
+    actionRoom.value = null;
+  } catch (e) {
+    assetError.value = e instanceof Error ? e.message : String(e);
+  }
+}
+
+async function submitAssetActionEdit(): Promise<void> {
+  if (!editingAssetId.value || !editingAsset.value) return;
+  try {
+    await updateAsset(editingAssetId.value, editingAsset.value);
+    assetMessage.value = "资产修改成功";
+    await loadAssetData();
+    showAssetActionDialog.value = false;
+    actionAsset.value = null;
+  } catch (e) {
+    assetError.value = e instanceof Error ? e.message : String(e);
+  }
 }
 
 function buildDefaultDueAt(): string {
@@ -1059,6 +1065,14 @@ onMounted(async () => {
         >
           <span class="sidebar-label">{{ sidebarCollapsed ? "产" : "资产管理" }}</span>
         </button>
+        <button
+          v-if="activePage === 'workspace'"
+          class="ghost tab-btn sub-tab-btn"
+          :class="{ active: workspaceSub === 'records' }"
+          @click="switchWorkspaceSub('records')"
+        >
+          <span class="sidebar-label">{{ sidebarCollapsed ? "览" : "巡检记录总览" }}</span>
+        </button>
         <button class="ghost tab-btn" :class="{ active: activePage === 'settings' }" @click="switchConsolePage('settings')">
           <span class="sidebar-label">{{ sidebarCollapsed ? "设" : "系统设置" }}</span>
         </button>
@@ -1493,7 +1507,7 @@ onMounted(async () => {
           <p class="hint" v-if="reviewMessage">{{ reviewMessage }}</p>
         </section>
 
-        <section class="panel" v-if="isReviewer && workspaceSub === 'inspection'">
+        <section class="panel" v-if="isReviewer && workspaceSub === 'records'">
           <h2>巡检记录总览（控制台）</h2>
           <div class="actions">
             <button class="ghost" :disabled="consoleLoading" @click="loadConsoleInspections">
@@ -1563,33 +1577,104 @@ onMounted(async () => {
 
     <!-- 房间操作弹窗 -->
     <div v-if="showRoomActionDialog && actionRoom" class="dialog-mask" @click.self="showRoomActionDialog = false">
-      <div class="dialog-panel">
-        <h3>房间操作</h3>
-        <p class="hint">{{ actionRoom.building_code }} / {{ actionRoom.room_code }}（{{ actionRoom.floor_label || "—" }}）{{ actionRoom.is_active ? "启用" : "禁用" }}</p>
-        <div class="action-dialog-btns">
-          <button @click="roomActionEdit">✏️ 编辑房间信息</button>
-          <button class="ghost" @click="roomActionQrcode">🔲 查看 / 下载二维码</button>
-          <button class="danger" @click="roomActionDelete">🗑 删除房间</button>
+      <div class="dialog-panel dialog-panel-wide">
+        <h3>房间管理 · {{ actionRoom.building_code }} / {{ actionRoom.room_code }}</h3>
+        <div class="dialog-two-col">
+          <div class="grid">
+            <div class="row">
+              <label>楼栋编码</label>
+              <input v-model="editingRoom.building_code" />
+            </div>
+            <div class="row">
+              <label>房间号</label>
+              <input v-model="editingRoom.room_code" />
+            </div>
+            <div class="row">
+              <label>楼层</label>
+              <input v-model="editingRoom.floor_label" />
+            </div>
+            <div class="row">
+              <label>位置</label>
+              <input v-model="editingRoom.location_text" />
+            </div>
+            <div class="row">
+              <label>状态</label>
+              <select v-model="editingRoom.is_active">
+                <option :value="true">启用</option>
+                <option :value="false">禁用</option>
+              </select>
+            </div>
+          </div>
+          <div class="dialog-qr-col">
+            <img :src="getRoomQrcodeUrl(actionRoom.room_id)" alt="二维码" class="dialog-qr-img" />
+            <a :href="getRoomQrcodeUrl(actionRoom.room_id)" download="二维码.png" target="_blank" class="qr-download-link">下载二维码</a>
+          </div>
         </div>
         <div class="actions">
+          <button @click="submitRoomActionEdit">保存修改</button>
+          <button class="danger" @click="roomActionDelete">删除房间</button>
           <button class="ghost" @click="showRoomActionDialog = false">关闭</button>
         </div>
+        <p class="hint" v-if="assetMessage">{{ assetMessage }}</p>
+        <p class="error" v-if="assetError">{{ assetError }}</p>
       </div>
     </div>
 
     <!-- 资产操作弹窗 -->
     <div v-if="showAssetActionDialog && actionAsset" class="dialog-mask" @click.self="showAssetActionDialog = false">
-      <div class="dialog-panel">
-        <h3>资产操作</h3>
-        <p class="hint">{{ actionAsset.asset_code }} · {{ actionAsset.asset_name }}（{{ formatAssetStatus(actionAsset.status) }}）</p>
-        <div class="action-dialog-btns">
-          <button @click="assetActionEdit">✏️ 编辑资产信息</button>
-          <button class="ghost" @click="assetActionQrcode">🔲 查看 / 下载二维码</button>
-          <button class="danger" @click="assetActionDelete">🗑 删除资产</button>
+      <div class="dialog-panel dialog-panel-wide">
+        <h3>资产管理 · {{ actionAsset.asset_code }} {{ actionAsset.asset_name }}</h3>
+        <div class="dialog-two-col">
+          <div class="grid">
+            <div class="row">
+              <label>资产编码</label>
+              <input v-model="editingAsset.asset_code" />
+            </div>
+            <div class="row">
+              <label>名称</label>
+              <input v-model="editingAsset.asset_name" />
+            </div>
+            <div class="row">
+              <label>类别</label>
+              <input v-model="editingAsset.asset_category" />
+            </div>
+            <div class="row">
+              <label>房间号</label>
+              <input v-model="editingAsset.room_code" />
+            </div>
+            <div class="row">
+              <label>数量</label>
+              <input type="number" v-model.number="editingAsset.quantity" min="1" />
+            </div>
+            <div class="row">
+              <label>状态</label>
+              <input v-model="editingAsset.status" />
+            </div>
+            <div class="row">
+              <label>厂家</label>
+              <input v-model="editingAsset.manufacturer" />
+            </div>
+            <div class="row">
+              <label>型号</label>
+              <input v-model="editingAsset.model" />
+            </div>
+            <div class="row">
+              <label>备注</label>
+              <input v-model="editingAsset.note" />
+            </div>
+          </div>
+          <div class="dialog-qr-col">
+            <img :src="getAssetQrcodeUrl(actionAsset.asset_id)" alt="二维码" class="dialog-qr-img" />
+            <a :href="getAssetQrcodeUrl(actionAsset.asset_id)" download="二维码.png" target="_blank" class="qr-download-link">下载二维码</a>
+          </div>
         </div>
         <div class="actions">
+          <button @click="submitAssetActionEdit">保存修改</button>
+          <button class="danger" @click="assetActionDelete">删除资产</button>
           <button class="ghost" @click="showAssetActionDialog = false">关闭</button>
         </div>
+        <p class="hint" v-if="assetMessage">{{ assetMessage }}</p>
+        <p class="error" v-if="assetError">{{ assetError }}</p>
       </div>
     </div>
 

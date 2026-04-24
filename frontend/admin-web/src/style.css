@@ -541,6 +541,79 @@ button.danger {
   word-break: break-word;
 }
 
+.dialog-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgb(4 10 24 / 48%);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.dialog-panel {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 20px 48px rgb(4 20 60 / 22%);
+  width: min(480px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.dialog-panel h3 {
+  margin: 0 0 16px;
+  font-size: 1.08rem;
+}
+
+.dialog-panel-wide {
+  width: min(720px, 100%);
+}
+
+.dialog-two-col {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  align-items: start;
+}
+
+.dialog-qr-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #dde6f7;
+  border-radius: 12px;
+  background: #f8fbff;
+}
+
+.dialog-qr-img {
+  width: 160px;
+  height: 160px;
+  border-radius: 8px;
+  border: 1px solid #d6e2f5;
+}
+
+.qr-download-link {
+  font-size: 0.86rem;
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.action-dialog-btns {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+@media (max-width: 600px) {
+  .dialog-two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 720px) {
   .page {
     width: min(var(--layout-max-width), calc(100vw - 24px));

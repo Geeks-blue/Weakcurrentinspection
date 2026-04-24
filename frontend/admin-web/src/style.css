@@ -36,18 +36,12 @@ body {
 }
 
 .page.page-logged-in {
-  display: grid;
-  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
-  gap: 16px;
-  align-items: start;
+  display: block;
+  padding-right: calc(var(--sidebar-width) + 24px);
 }
 
 .page.page-logged-in.sidebar-collapsed {
-  grid-template-columns: var(--sidebar-width-collapsed) minmax(0, 1fr);
-}
-
-.page.page-logged-in > :not(.view-switch):not(.photo-lightbox):not(.dialog-mask) {
-  grid-column: 2;
+  padding-right: calc(var(--sidebar-width-collapsed) + 24px);
 }
 
 .hero {
@@ -78,11 +72,12 @@ body {
 }
 
 .page.page-logged-in .view-switch {
-  grid-column: 1;
   margin-top: 0;
-  position: sticky;
-  top: 14px;
-  align-self: start;
+  position: fixed;
+  top: 18px;
+  right: 24px;
+  width: var(--sidebar-width);
+  z-index: 40;
   flex-direction: column;
   flex-wrap: nowrap;
   align-items: stretch;
@@ -91,6 +86,10 @@ body {
   border: 1px solid #d6e1f2;
   background: #fff;
   box-shadow: 0 10px 28px rgb(14 39 84 / 8%);
+}
+
+.page.page-logged-in.sidebar-collapsed .view-switch {
+  width: var(--sidebar-width-collapsed);
 }
 
 .page.page-logged-in .view-switch .status-pill {
@@ -521,14 +520,12 @@ button.danger {
   .page.page-logged-in,
   .page.page-logged-in.sidebar-collapsed {
     display: block;
-  }
-
-  .page.page-logged-in > :not(.view-switch):not(.photo-lightbox):not(.dialog-mask) {
-    grid-column: auto;
+    padding-right: 0;
   }
 
   .page.page-logged-in .view-switch {
     position: static;
+    width: auto;
     flex-direction: row;
     flex-wrap: wrap;
     padding: 0;

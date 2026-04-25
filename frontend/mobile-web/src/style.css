@@ -36,53 +36,62 @@ h1 {
   font-size: clamp(1.3rem, 2vw + 0.9rem, 1.9rem);
 }
 
-.m-login-shell {
-  min-height: 72vh;
-  display: grid;
-  gap: 16px;
-  grid-template-columns: 1.1fr 0.9fr;
-  align-items: stretch;
-}
-
-.m-login-hero {
-  border-radius: 18px;
+.login-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 60px);
   padding: 24px;
-  background:
-    radial-gradient(circle at 78% 20%, rgb(255 255 255 / 18%) 0, transparent 34%),
-    linear-gradient(145deg, #1b53d8 0%, #1677ff 58%, #55a8ff 100%);
-  color: #f7fbff;
-  box-shadow: 0 16px 34px rgb(18 74 176 / 24%);
-  display: grid;
-  align-content: start;
-  gap: 10px;
 }
 
-.m-login-hero p {
-  margin: 0;
-  line-height: 1.65;
-  color: rgb(247 251 255 / 92%);
+.login-card {
+  width: min(420px, 100%);
+  background: #fff;
+  border: 1px solid #cad8ef;
+  border-radius: 20px;
+  padding: 36px 32px;
+  box-shadow: 0 20px 48px rgb(17 54 112 / 14%);
 }
 
-.m-login-tag {
-  width: fit-content;
-  padding: 6px 11px;
+.login-card-brand {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.login-card-brand h1 {
+  margin: 10px 0 6px;
+  font-size: 1.5rem;
+  letter-spacing: 0.01em;
+  color: var(--text);
+}
+
+.login-brand-tag {
+  display: inline-block;
+  padding: 4px 12px;
   border-radius: 999px;
-  background: rgb(255 255 255 / 16%);
-  border: 1px solid rgb(255 255 255 / 26%);
-  font-size: 0.82rem;
+  background: #edf3ff;
+  border: 1px solid #c6d8ff;
   font-weight: 700;
+  font-size: 0.82rem;
   letter-spacing: 0.04em;
+  color: #24436f;
 }
 
-.m-login-points {
-  margin: 6px 0 0;
-  padding-left: 18px;
-  display: grid;
-  gap: 8px;
+.login-card label {
+  display: block;
+  margin-top: 14px;
+  margin-bottom: 6px;
+  font-weight: 600;
+  color: var(--muted);
 }
 
-.m-login-points li {
-  color: rgb(247 251 255 / 92%);
+.login-btn {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 20px;
+  background: linear-gradient(90deg, #1677ff 0%, #2f88ff 100%);
+  box-shadow: 0 10px 22px rgb(22 119 255 / 22%);
 }
 
 .card {
@@ -93,24 +102,6 @@ h1 {
   padding: 16px;
   margin-bottom: 12px;
   box-shadow: 0 9px 22px rgb(20 46 92 / 8%);
-}
-
-.m-login-card {
-  margin: 0;
-  border-color: #cad8ef;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-  box-shadow: 0 16px 34px rgb(17 54 112 / 12%);
-}
-
-.m-login-actions {
-  margin-top: 14px;
-}
-
-.m-primary-btn {
-  width: 100%;
-  min-height: 44px;
-  background: linear-gradient(90deg, #1a74ff 0%, #358bff 100%);
-  box-shadow: 0 10px 22px rgb(26 116 255 / 24%);
 }
 
 .m-work-header {
@@ -464,15 +455,9 @@ button.ghost {
     width: min(var(--layout-max-width), calc(100vw - 24px));
   }
 
-  .m-login-shell {
-    min-height: auto;
-    grid-template-columns: 1fr;
-  }
-
-  .m-login-hero,
-  .m-login-card,
-  .card {
-    border-radius: 14px;
+  .login-card {
+    border-radius: 16px;
+    padding: 24px 20px;
   }
 
   .m-work-header {

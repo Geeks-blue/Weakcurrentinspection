@@ -576,33 +576,21 @@ onMounted(async () => {
 <template>
   <div class="mobile-page">
     <template v-if="!isStudentLoggedIn">
-      <section class="m-login-shell">
-        <div class="m-login-hero">
-          <p class="m-login-tag">Student Inspector</p>
-          <h1>弱电巡检移动工作台</h1>
-          <p>使用学生账号登录后，可执行任务签到、巡检填报、照片上传和记录查询。</p>
-          <ul class="m-login-points">
-            <li>统一入口自动识别身份</li>
-            <li>支持扫码与手动补录签到</li>
-            <li>巡检记录实时回写审核流</li>
-          </ul>
-        </div>
-
-        <section class="card m-login-card">
-          <h2>账号登录</h2>
-          <p class="hint">移动端仅允许学生账号登录。</p>
-
+      <div class="login-center">
+        <div class="login-card">
+          <div class="login-card-brand">
+            <p class="login-brand-tag">Student Inspector</p>
+            <h1>弱电巡检移动工作台</h1>
+            <p class="hint">学生账号登录后可执行任务签到与巡检填报。</p>
+          </div>
           <label>账号</label>
           <input v-model="username" placeholder="student_f01" />
           <label>密码</label>
           <input v-model="password" type="password" placeholder="请输入登录密码" />
-
-          <div class="row m-login-actions">
-            <button class="m-primary-btn" :disabled="loading" @click="doLogin">{{ loading ? "登录中..." : "立即登录" }}</button>
-          </div>
+          <button class="login-btn" :disabled="loading" @click="doLogin">{{ loading ? "登录中..." : "立即登录" }}</button>
           <p class="hint" v-if="loginMessage">{{ loginMessage }}</p>
-        </section>
-      </section>
+        </div>
+      </div>
     </template>
 
     <template v-else>

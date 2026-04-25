@@ -1016,37 +1016,23 @@ onMounted(async () => {
     </header>
 
     <template v-if="!isLoggedIn">
-      <section class="login-shell">
-        <div class="login-brand-panel">
-          <p class="login-brand-tag">Campus Infra Console</p>
-          <h1>弱电巡检统一登录入口</h1>
-          <p>
-            面向校园弱电巡检与资产核验场景，支持按角色自动分流：学生进入移动巡检端，教师/管理员进入管理控制台。
-          </p>
-          <ul class="login-brand-list">
-            <li>统一身份认证</li>
-            <li>教师派单与审核闭环</li>
-            <li>管理员账号治理与权限隔离</li>
-          </ul>
-        </div>
-
-        <section class="login-card-panel">
-          <h2>账号登录</h2>
-          <p class="hint">请输入账号和密码登录管理台。</p>
-
+      <div class="login-center">
+        <div class="login-card">
+          <div class="login-card-brand">
+            <p class="login-brand-tag">Campus Infra Console</p>
+            <h1>弱电巡检管理台</h1>
+            <p class="hint">教师 / 管理员统一入口，学生请使用移动端。</p>
+          </div>
           <label for="username">账号</label>
           <input id="username" v-model="username" placeholder="teacher01 / admin" />
           <label for="password">密码</label>
           <input id="password" v-model="password" type="password" placeholder="请输入登录密码" />
-
-          <div class="login-actions">
-            <button class="login-submit-btn" :disabled="authLoading" @click="handleLogin">
-              {{ authLoading ? "登录中..." : "立即登录" }}
-            </button>
-          </div>
+          <button class="login-btn" :disabled="authLoading" @click="handleLogin">
+            {{ authLoading ? "登录中..." : "立即登录" }}
+          </button>
           <p class="hint" v-if="authMessage">{{ authMessage }}</p>
-        </section>
-      </section>
+        </div>
+      </div>
     </template>
 
     <template v-else>

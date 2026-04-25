@@ -1030,21 +1030,16 @@ onMounted(async () => {
           </ul>
         </div>
 
-        <section class="panel login-only-panel login-card-panel">
+        <section class="login-card-panel">
           <h2>账号登录</h2>
-          <p class="hint">请输入账号和密码登录系统。</p>
-          <p class="hint">后端与移动端地址已由配置文件统一托管。</p>
-          <div class="grid login-form-grid">
-            <div class="row">
-              <label for="username">账号</label>
-              <input id="username" v-model="username" placeholder="student_f01 / teacher01 / admin" />
-            </div>
-            <div class="row">
-              <label for="password">密码</label>
-              <input id="password" v-model="password" type="password" placeholder="请输入登录密码" />
-            </div>
-          </div>
-          <div class="actions login-actions">
+          <p class="hint">请输入账号和密码登录管理台。</p>
+
+          <label for="username">账号</label>
+          <input id="username" v-model="username" placeholder="teacher01 / admin" />
+          <label for="password">密码</label>
+          <input id="password" v-model="password" type="password" placeholder="请输入登录密码" />
+
+          <div class="login-actions">
             <button class="login-submit-btn" :disabled="authLoading" @click="handleLogin">
               {{ authLoading ? "登录中..." : "立即登录" }}
             </button>

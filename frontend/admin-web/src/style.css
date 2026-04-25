@@ -248,21 +248,24 @@ button.tab-btn.active {
 }
 
 .login-card-panel {
-  margin-top: 0;
+  width: 100%;
+  border: 1px solid #cad8ef;
   border-radius: 18px;
-  border-color: #cad8ef;
+  padding: 16px;
   background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
   box-shadow: 0 16px 34px rgb(17 54 112 / 12%);
   display: grid;
   align-content: start;
 }
 
-.login-card-panel h2 {
-  margin-bottom: 8px;
+.login-card-panel label {
+  display: block;
+  margin-top: 10px;
+  margin-bottom: 4px;
 }
 
-.login-form-grid {
-  gap: 12px;
+.login-card-panel h2 {
+  margin-bottom: 4px;
 }
 
 .panel h2 {

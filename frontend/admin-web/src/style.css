@@ -8,10 +8,10 @@
   --secondary: #2f54eb;
   --line: #d7deea;
   --danger: #d4380d;
-  --layout-max-width: 1320px;
-  --layout-gutter: 24px;
-  --sidebar-width: 240px;
-  --sidebar-width-collapsed: 86px;
+  --layout-max-width: 960px;
+  --layout-gutter: 20px;
+  --sidebar-width: 220px;
+  --sidebar-width-collapsed: 72px;
 }
 
 * {
@@ -36,12 +36,33 @@ body {
 }
 
 .page.page-logged-in {
-  display: block;
-  padding-right: calc(var(--sidebar-width) + 24px);
+  width: min(calc(var(--layout-max-width) + var(--sidebar-width) + 20px), calc(100vw - var(--layout-gutter) * 2));
 }
 
 .page.page-logged-in.sidebar-collapsed {
-  padding-right: calc(var(--sidebar-width-collapsed) + 24px);
+  width: min(calc(var(--layout-max-width) + var(--sidebar-width-collapsed) + 20px), calc(100vw - var(--layout-gutter) * 2));
+}
+
+.workspace-shell {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  margin-top: 16px;
+}
+
+.workspace-sidebar {
+  flex: 0 0 var(--sidebar-width);
+  position: sticky;
+  top: 18px;
+}
+
+.sidebar-collapsed .workspace-sidebar {
+  flex-basis: var(--sidebar-width-collapsed);
+}
+
+.workspace-content {
+  flex: 1;
+  min-width: 0;
 }
 
 .hero {
@@ -73,11 +94,11 @@ body {
 
 .page.page-logged-in .view-switch {
   margin-top: 0;
-  position: fixed;
-  top: 18px;
-  right: 24px;
-  width: var(--sidebar-width);
-  z-index: 40;
+  position: static;
+  width: auto;
+  right: auto;
+  top: auto;
+  z-index: auto;
   flex-direction: column;
   flex-wrap: nowrap;
   align-items: stretch;
@@ -89,7 +110,7 @@ body {
 }
 
 .page.page-logged-in.sidebar-collapsed .view-switch {
-  width: var(--sidebar-width-collapsed);
+  width: auto;
 }
 
 .page.page-logged-in .view-switch .status-pill {
@@ -651,25 +672,33 @@ button.danger {
 
 @media (max-width: 720px) {
   .page {
-    width: min(var(--layout-max-width), calc(100vw - 24px));
+    width: min(var(--layout-max-width), calc(100vw - 16px));
     padding-top: 14px;
   }
 
   .page.page-logged-in,
   .page.page-logged-in.sidebar-collapsed {
-    display: block;
-    padding-right: 0;
+    width: min(var(--layout-max-width), calc(100vw - 16px));
+  }
+
+  .workspace-shell {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .workspace-sidebar {
+    position: static;
+    flex-basis: auto;
   }
 
   .page.page-logged-in .view-switch {
-    position: static;
-    width: auto;
     flex-direction: row;
     flex-wrap: wrap;
     padding: 0;
     border: 0;
     box-shadow: none;
     background: transparent;
+    border-radius: 0;
   }
 
   .login-shell {

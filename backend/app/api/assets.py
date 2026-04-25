@@ -88,6 +88,7 @@ def update_room(room_id: int, item: AssetRoomItem, db: Session = Depends(get_db)
         raise HTTPException(status_code=400, detail="楼栋不存在")
     room.building_id = building.id
     room.room_code = item.room_code
+    room.qr_token = f"QR-{item.room_code}"
     room.floor_label = item.floor_label
     room.location_text = item.location_text
     room.is_active = item.is_active
@@ -365,6 +366,7 @@ def import_rooms(
             room.floor_label = row.get("floor_label") or room.floor_label
             room.location_text = row.get("location_text") or room.location_text
             room.is_active = is_active
+            room.qr_token = row.get("qr_token") or f"QR-{room_code}"
             updated_count += 1
         else:
             room = Room(

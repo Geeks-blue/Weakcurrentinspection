@@ -1055,7 +1055,9 @@ onMounted(async () => {
     </template>
 
     <template v-else>
-      <nav class="view-switch" :class="{ collapsed: sidebarCollapsed }">
+      <div class="workspace-shell">
+        <aside class="workspace-sidebar">
+          <nav class="view-switch" :class="{ collapsed: sidebarCollapsed }">
         <button class="ghost tab-btn sidebar-toggle-btn" @click="toggleSidebar">
           {{ sidebarCollapsed ? "展开 »" : "« 收起" }}
         </button>
@@ -1095,7 +1097,9 @@ onMounted(async () => {
         <span class="status-pill" :class="{ online: isLoggedIn }">
           {{ sidebarCollapsed ? "在线" : userStatusText }}
         </span>
-      </nav>
+          </nav>
+        </aside>
+        <div class="workspace-content">
 
       <template v-if="activePage === 'settings'">
         <section class="panel two-col">
@@ -1595,6 +1599,8 @@ onMounted(async () => {
           <p class="hint" v-else>暂无巡检记录。</p>
         </section>
       </template>
+        </div>
+      </div>
     </template>
 
     <div class="photo-lightbox" v-if="previewPhotoUrl" @click.self="closePhotoPreview">

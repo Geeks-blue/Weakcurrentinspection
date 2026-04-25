@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, declarative_base
 
 from app.deps import get_db, require_teacher_or_admin
 from app.models.entities import Asset, Building, Room, User
-from app.schemas.assets import AssetItemView, AssetRoomItem, ImportSummary
+from app.schemas.assets import AssetItemView, AssetRoomCreate, AssetRoomItem, ImportSummary
 
 router = APIRouter()
 BaseTmp = declarative_base()
@@ -53,10 +53,17 @@ def sign_asset(asset_id: int, db: Session = Depends(get_db), user: User = Depend
     db.commit()
     return {"ok": True, "sign_time": log.sign_time}
 @router.post("/room", response_model=AssetRoomItem)
-def create_room(item: AssetRoomItem, db: Session = Depends(get_db), _: User = Depends(require_teacher_or_admin)):
+def create_room(item: AssetRoomCreate, db: Session = Depends(get_db), _: User = Depends(require_teacher_or_admin)):
     building = db.query(Building).filter(Building.code == item.building_code).first()
     if not building:
-        raise HTTPException(status_code=400, detail="楼栋不存在")
+        building = Building(
+            code=item.building_code,
+            name=item.building_code,
+            category="public",
+            gender_restriction="none",
+        )
+        db.add(building)
+        db.flush()
     room = Room(
         room_code=item.room_code,
         building_id=building.id,
@@ -79,13 +86,20 @@ def create_room(item: AssetRoomItem, db: Session = Depends(get_db), _: User = De
     )
 
 @router.put("/room/{room_id}", response_model=AssetRoomItem)
-def update_room(room_id: int, item: AssetRoomItem, db: Session = Depends(get_db), _: User = Depends(require_teacher_or_admin)):
+def update_room(room_id: int, item: AssetRoomCreate, db: Session = Depends(get_db), _: User = Depends(require_teacher_or_admin)):
     room = db.query(Room).filter(Room.id == room_id).first()
     if not room:
         raise HTTPException(status_code=404, detail="房间不存在")
     building = db.query(Building).filter(Building.code == item.building_code).first()
     if not building:
-        raise HTTPException(status_code=400, detail="楼栋不存在")
+        building = Building(
+            code=item.building_code,
+            name=item.building_code,
+            category="public",
+            gender_restriction="none",
+        )
+        db.add(building)
+        db.flush()
     room.building_id = building.id
     room.room_code = item.room_code
     room.qr_token = f"QR-{item.room_code}"

@@ -14,6 +14,14 @@ class AssetRoomItem(BaseModel):
     is_active: bool
 
 
+class AssetRoomCreate(BaseModel):
+    building_code: str
+    room_code: str
+    floor_label: str | None = None
+    location_text: str | None = None
+    is_active: bool = True
+
+
 class AssetItemView(BaseModel):
     asset_id: int
     asset_code: str

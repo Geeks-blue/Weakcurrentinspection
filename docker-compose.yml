@@ -35,6 +35,21 @@ services:
     volumes:
       - minio_data:/data
 
+  nginx:
+    image: nginx:alpine
+    container_name: wc_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "5173:5173"
+      - "5174:5174"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./frontend/admin-web/dist:/var/www/admin:ro
+      - ./frontend/mobile-web/dist:/var/www/mobile:ro
+
 volumes:
   pg_data:
   minio_data:

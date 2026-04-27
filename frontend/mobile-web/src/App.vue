@@ -245,6 +245,11 @@ function getLocation(): void {
     geoManual.value = true;
     return;
   }
+  if (!window.isSecureContext) {
+    geoError.value = "定位需要 HTTPS 连接，当前页面为 HTTP，Safari 不会弹出授权框。请联系管理员启用 HTTPS，或手动输入坐标。";
+    geoManual.value = true;
+    return;
+  }
   geoLoading.value = true;
   geoError.value = "";
   geoManual.value = false;

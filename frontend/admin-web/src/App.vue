@@ -194,6 +194,8 @@ const deleteConfirmInspectionCount = ref(0);
 const actionRoom = ref<AssetRoomItem | null>(null);
 const showAssetActionDialog = ref(false);
 const actionAsset = ref<AssetItemView | null>(null);
+const selectedRoomId = ref<number | null>(null);
+const selectedAssetId = ref<number | null>(null);
 
 function openRoomDialog(room?: AssetRoomItem) {
   if (room) {
@@ -322,28 +324,36 @@ function closeQrcodeDialog() {
 }
 
 function openRoomActionDialog(room: AssetRoomItem): void {
+  selectedRoomId.value = room.room_id;
   editingRoom.value = { ...room };
   editingRoomId.value = room.room_id;
   actionRoom.value = room;
-  showRoomActionDialog.value = true;
 }
 
-function roomActionDelete(): void {
-  const room = actionRoom.value;
-  showRoomActionDialog.value = false;
+function editSelectedRoom(): void {
+  const room = assetRooms.value.find(r => r.room_id === selectedRoomId.value);
+  if (room) openRoomDialog(room);
+}
+
+function deleteSelectedRoom(): void {
+  const room = assetRooms.value.find(r => r.room_id === selectedRoomId.value);
   if (room) handleDeleteRoom(room.room_id);
 }
 
 function openAssetActionDialog(asset: AssetItemView): void {
+  selectedAssetId.value = asset.asset_id;
   editingAsset.value = { ...asset };
   editingAssetId.value = asset.asset_id;
   actionAsset.value = asset;
-  showAssetActionDialog.value = true;
 }
 
-function assetActionDelete(): void {
-  const asset = actionAsset.value;
-  showAssetActionDialog.value = false;
+function editSelectedAsset(): void {
+  const asset = assets.value.find(a => a.asset_id === selectedAssetId.value);
+  if (asset) openAssetDialog(asset);
+}
+
+function deleteSelectedAsset(): void {
+  const asset = assets.value.find(a => a.asset_id === selectedAssetId.value);
   if (asset) handleDeleteAsset(asset.asset_id);
 }
 
@@ -1463,9 +1473,15 @@ onMounted(async () => {
           <p class="hint" v-if="assetMessage">{{ assetMessage }}</p>
           <p class="error" v-if="assetError">{{ assetError }}</p>
 
-          <div class="asset-stack-layout">
+          <div class="two-col asset-layout">
             <div class="table-card">
-              <h3>房间台账（{{ assetRooms.length }}）</h3>
+              <div class="table-card-header">
+                <h3>房间台账（{{ assetRooms.length }}）</h3>
+                <div class="table-header-actions">
+                  <button class="ghost btn-sm" :disabled="!selectedRoomId" @click="editSelectedRoom">编辑</button>
+                  <button class="danger btn-sm" :disabled="!selectedRoomId" @click="deleteSelectedRoom">删除</button>
+                </div>
+              </div>
               <div class="table-wrap">
                 <table class="data-table">
                   <thead>
@@ -1476,7 +1492,6 @@ onMounted(async () => {
                       <th>位置</th>
                       <th>状态</th>
                       <th>资产数</th>
-                      <th>操作</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1484,7 +1499,8 @@ onMounted(async () => {
                       v-for="room in assetRooms.slice(0, 120)"
                       :key="room.room_id"
                       class="room-row"
-                      :class="{ 'room-row-selected': selectedRoomCode === room.room_code }"
+                      :class="{ 'room-row-selected': selectedRoomId === room.room_id }"
+                      @click="openRoomActionDialog(room)"
                     >
                       <td>{{ room.building_code }}</td>
                       <td>{{ room.room_code }}</td>
@@ -1495,12 +1511,9 @@ onMounted(async () => {
                         <span
                           class="asset-count-badge asset-count-clickable"
                           :class="{ 'asset-count-active': selectedRoomCode === room.room_code }"
-                          @click="selectedRoomCode = selectedRoomCode === room.room_code ? '' : room.room_code"
+                          @click.stop="selectedRoomCode = selectedRoomCode === room.room_code ? '' : room.room_code"
                           title="点击筛选该房间资产"
                         >{{ roomAssetCount[room.room_code] || 0 }} 件</span>
-                      </td>
-                      <td>
-                        <button class="ghost btn-sm" @click="openRoomActionDialog(room)">操作</button>
                       </td>
                     </tr>
                   </tbody>
@@ -1509,13 +1522,19 @@ onMounted(async () => {
             </div>
 
             <div class="table-card">
-              <h3>
-                资产台账（{{ filteredAssets.length }}<template v-if="selectedRoomCode"> / {{ assets.length }}</template>）
-                <template v-if="selectedRoomCode">
-                  <span class="room-filter-badge">{{ selectedRoomCode }}</span>
-                  <button class="ghost btn-sm" style="margin-left:6px" @click="selectedRoomCode = ''">✕ 清除筛选</button>
-                </template>
-              </h3>
+              <div class="table-card-header">
+                <h3>
+                  资产台账（{{ filteredAssets.length }}<template v-if="selectedRoomCode"> / {{ assets.length }}</template>）
+                  <template v-if="selectedRoomCode">
+                    <span class="room-filter-badge">{{ selectedRoomCode }}</span>
+                    <button class="ghost btn-sm" style="margin-left:6px" @click="selectedRoomCode = ''">✕</button>
+                  </template>
+                </h3>
+                <div class="table-header-actions">
+                  <button class="ghost btn-sm" :disabled="!selectedAssetId" @click="editSelectedAsset">编辑</button>
+                  <button class="danger btn-sm" :disabled="!selectedAssetId" @click="deleteSelectedAsset">删除</button>
+                </div>
+              </div>
               <div class="table-wrap">
                 <table class="data-table">
                   <thead>
@@ -1525,19 +1544,21 @@ onMounted(async () => {
                       <th>位置</th>
                       <th>数量</th>
                       <th>状态</th>
-                      <th>操作</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="asset in filteredAssets.slice(0, 200)" :key="asset.asset_id">
+                    <tr
+                      v-for="asset in filteredAssets.slice(0, 200)"
+                      :key="asset.asset_id"
+                      class="room-row"
+                      :class="{ 'room-row-selected': selectedAssetId === asset.asset_id }"
+                      @click="openAssetActionDialog(asset)"
+                    >
                       <td>{{ asset.asset_code }}</td>
                       <td>{{ asset.asset_name }}</td>
                       <td>{{ asset.building_code }} / {{ asset.room_code }}</td>
                       <td>{{ asset.quantity }}</td>
                       <td>{{ formatAssetStatus(asset.status) }}</td>
-                      <td>
-                        <button class="ghost btn-sm" @click="openAssetActionDialog(asset)">操作</button>
-                      </td>
                     </tr>
                   </tbody>
                 </table>

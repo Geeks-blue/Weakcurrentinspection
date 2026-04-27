@@ -1507,7 +1507,7 @@ onMounted(async () => {
           <p class="hint" v-if="assetMessage">{{ assetMessage }}</p>
           <p class="error" v-if="assetError">{{ assetError }}</p>
 
-          <div class="two-col asset-layout">
+          <div class="asset-stack-layout">
             <div class="table-card">
               <h3>房间台账（{{ assetRooms.length }}）</h3>
               <div class="table-wrap">

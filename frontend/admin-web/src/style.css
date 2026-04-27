@@ -388,6 +388,12 @@ button.danger {
   margin: 0 0 10px;
 }
 
+.asset-stack-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .asset-layout {
   align-items: start;
 }
@@ -472,7 +478,7 @@ button.danger {
 .data-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 560px;
+  min-width: 400px;
 }
 
 .data-table th,

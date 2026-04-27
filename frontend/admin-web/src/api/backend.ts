@@ -235,9 +235,25 @@ export async function uploadInspectionPhoto(file: Blob, filename: string): Promi
   return data as InspectionPhotoUploadResponse;
 }
 
-export async function getConsoleInspections(limit = 120): Promise<ConsoleInspectionItem[]> {
+export interface ConsoleInspectionFilters {
+  status?: string;
+  room_code?: string;
+  student_username?: string;
+  submitted_from?: string;
+  submitted_to?: string;
+  limit?: number;
+}
+
+export async function getConsoleInspections(filters: ConsoleInspectionFilters = {}): Promise<ConsoleInspectionItem[]> {
   const token = getAccessToken();
-  const response = await fetch(`${getBackendBaseUrl()}/inspections/console-records?limit=${limit}`, {
+  const params = new URLSearchParams();
+  params.set("limit", String(filters.limit ?? 120));
+  if (filters.status) params.set("status", filters.status);
+  if (filters.room_code) params.set("room_code", filters.room_code);
+  if (filters.student_username) params.set("student_username", filters.student_username);
+  if (filters.submitted_from) params.set("submitted_from", filters.submitted_from);
+  if (filters.submitted_to) params.set("submitted_to", filters.submitted_to);
+  const response = await fetch(`${getBackendBaseUrl()}/inspections/console-records?${params.toString()}`, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${token}`

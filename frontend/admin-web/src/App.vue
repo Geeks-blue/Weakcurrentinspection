@@ -15,6 +15,7 @@ import {
   getAccessToken,
   getBackendBaseUrl,
   getConsoleInspections,
+  type ConsoleInspectionFilters,
   getMe,
   getMobileWebUrl,
   getPendingTaskAssignments,
@@ -66,6 +67,11 @@ const pendingError = ref("");
 const consoleInspections = ref<ConsoleInspectionItem[]>([]);
 const consoleLoading = ref(false);
 const consoleError = ref("");
+const consoleFilterStatus = ref("");
+const consoleFilterRoomCode = ref("");
+const consoleFilterUsername = ref("");
+const consoleFilterFrom = ref("");
+const consoleFilterTo = ref("");
 const deletingInspectionId = ref<number | null>(null);
 const confirmDeleteInspectionId = ref<number | null>(null);
 const selectedInspectionId = ref<number | null>(null);
@@ -827,7 +833,13 @@ async function loadConsoleInspections(): Promise<void> {
   consoleLoading.value = true;
   consoleError.value = "";
   try {
-    consoleInspections.value = await getConsoleInspections();
+    const filters: ConsoleInspectionFilters = {};
+    if (consoleFilterStatus.value) filters.status = consoleFilterStatus.value;
+    if (consoleFilterRoomCode.value.trim()) filters.room_code = consoleFilterRoomCode.value.trim();
+    if (consoleFilterUsername.value.trim()) filters.student_username = consoleFilterUsername.value.trim();
+    if (consoleFilterFrom.value) filters.submitted_from = new Date(consoleFilterFrom.value).toISOString();
+    if (consoleFilterTo.value) filters.submitted_to = new Date(consoleFilterTo.value).toISOString();
+    consoleInspections.value = await getConsoleInspections(filters);
   } catch (error) {
     consoleError.value = error instanceof Error ? error.message : "加载巡检记录失败。";
   } finally {
@@ -1521,9 +1533,40 @@ onMounted(async () => {
 
         <section class="panel" v-if="isReviewer && workspaceSub === 'records'">
           <h2>巡检记录总览（控制台）</h2>
+          <div class="grid">
+            <div class="row">
+              <label>状态筛选</label>
+              <select v-model="consoleFilterStatus">
+                <option value="">全部状态</option>
+                <option value="pending_review">待审核</option>
+                <option value="approved">已通过</option>
+                <option value="rejected">已驳回</option>
+                <option value="rectify_required">需整改</option>
+              </select>
+            </div>
+            <div class="row">
+              <label>弱电间编号</label>
+              <input v-model="consoleFilterRoomCode" placeholder="如 dorm-2-R1" />
+            </div>
+            <div class="row">
+              <label>学生账号</label>
+              <input v-model="consoleFilterUsername" placeholder="如 student_f01" />
+            </div>
+            <div class="row">
+              <label>提交开始时间</label>
+              <input v-model="consoleFilterFrom" type="datetime-local" />
+            </div>
+            <div class="row">
+              <label>提交结束时间</label>
+              <input v-model="consoleFilterTo" type="datetime-local" />
+            </div>
+          </div>
           <div class="actions">
-            <button class="ghost" :disabled="consoleLoading" @click="loadConsoleInspections">
-              {{ consoleLoading ? "加载中..." : "刷新巡检记录" }}
+            <button :disabled="consoleLoading" @click="loadConsoleInspections">
+              {{ consoleLoading ? "加载中..." : "🔍 筛选查询" }}
+            </button>
+            <button class="ghost" @click="() => { consoleFilterStatus = ''; consoleFilterRoomCode = ''; consoleFilterUsername = ''; consoleFilterFrom = ''; consoleFilterTo = ''; loadConsoleInspections(); }">
+              清空筛选
             </button>
           </div>
           <p class="error" v-if="consoleError">{{ consoleError }}</p>

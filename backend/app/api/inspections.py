@@ -133,19 +133,40 @@ def get_inspection_photo(object_key: str) -> FileResponse:
 def console_records(
     request: Request,
     limit: int = Query(default=120, ge=1, le=500),
+    status: str | None = Query(default=None),
+    room_code: str | None = Query(default=None),
+    student_username: str | None = Query(default=None),
+    submitted_from: str | None = Query(default=None),
+    submitted_to: str | None = Query(default=None),
     db: Session = Depends(get_db),
     _: User = Depends(require_teacher_or_admin),
 ) -> list[ConsoleInspectionItem]:
     # 控制台记录：用于教师/管理员查看巡检提交与审核结果（含已审核数据）。
-    rows = (
+    query = (
         db.query(Inspection, Room, Building, User)
         .join(Room, Inspection.room_id == Room.id)
         .join(Building, Room.building_id == Building.id)
         .join(User, Inspection.inspector_user_id == User.id)
-        .order_by(Inspection.submitted_at.desc())
-        .limit(limit)
-        .all()
     )
+    if status:
+        query = query.filter(Inspection.status == status)
+    if room_code:
+        query = query.filter(Room.room_code.ilike(f"%{room_code.strip()}%"))
+    if student_username:
+        query = query.filter(User.username.ilike(f"%{student_username.strip()}%"))
+    if submitted_from:
+        from datetime import datetime as _dt
+        try:
+            query = query.filter(Inspection.submitted_at >= _dt.fromisoformat(submitted_from))
+        except ValueError:
+            pass
+    if submitted_to:
+        from datetime import datetime as _dt
+        try:
+            query = query.filter(Inspection.submitted_at <= _dt.fromisoformat(submitted_to))
+        except ValueError:
+            pass
+    rows = query.order_by(Inspection.submitted_at.desc()).limit(limit).all()
 
     result: list[ConsoleInspectionItem] = []
     for inspection, room, building, inspector in rows:

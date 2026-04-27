@@ -188,7 +188,9 @@ const showQrcodeDialog = ref(false);
 const qrcodeUrl = ref("");
 const qrcodeTitle = ref("");
 const previewPhotoUrl = ref("");
-const showRoomActionDialog = ref(false);
+const showRoomDeleteConfirm = ref(false);
+const deleteConfirmRoomId = ref<number | null>(null);
+const deleteConfirmInspectionCount = ref(0);
 const actionRoom = ref<AssetRoomItem | null>(null);
 const showAssetActionDialog = ref(false);
 const actionAsset = ref<AssetItemView | null>(null);
@@ -227,13 +229,33 @@ async function submitRoomDialog() {
 }
 
 async function handleDeleteRoom(room_id: number) {
-  if (!confirm("确定要删除该房间？")) return;
   try {
     await deleteRoom(room_id);
     assetMessage.value = "房间已删除";
     await loadAssetData();
   } catch (e) {
+    if (e instanceof Error && e.message.startsWith("ROOM_HAS_INSPECTIONS:")) {
+      const count = parseInt(e.message.split(":")[1] || "0");
+      deleteConfirmRoomId.value = room_id;
+      deleteConfirmInspectionCount.value = count;
+      showRoomDeleteConfirm.value = true;
+      return;
+    }
     assetError.value = e instanceof Error ? e.message : String(e);
+  }
+}
+
+async function confirmForceDeleteRoom() {
+  if (!deleteConfirmRoomId.value) return;
+  showRoomDeleteConfirm.value = false;
+  try {
+    await deleteRoom(deleteConfirmRoomId.value, true);
+    assetMessage.value = `房间及 ${deleteConfirmInspectionCount.value} 条巡检记录已删除`;
+    await loadAssetData();
+  } catch (e) {
+    assetError.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    deleteConfirmRoomId.value = null;
   }
 }
 
@@ -1721,6 +1743,19 @@ onMounted(async () => {
     <div class="photo-lightbox" v-if="previewPhotoUrl" @click.self="closePhotoPreview">
       <button class="photo-lightbox-close" @click="closePhotoPreview">关闭</button>
       <img :src="previewPhotoUrl" alt="巡检照片预览" />
+    </div>
+
+    <!-- 删除房间确认弹窗（有巡检记录时） -->
+    <div v-if="showRoomDeleteConfirm" class="dialog-mask" @click.self="showRoomDeleteConfirm = false">
+      <div class="dialog-panel">
+        <h3>⚠️ 此房间存在巡检记录</h3>
+        <p>该房间共有 <strong>{{ deleteConfirmInspectionCount }}</strong> 条巡检记录（含照片和审核日志）。</p>
+        <p class="hint">确认删除后，房间及所有关联记录将被永久清除，且不可恢复。</p>
+        <div class="actions">
+          <button class="danger" @click="confirmForceDeleteRoom">确认全部删除</button>
+          <button class="ghost" @click="showRoomDeleteConfirm = false">取消</button>
+        </div>
+      </div>
     </div>
 
     <!-- 编辑用户弹窗 -->

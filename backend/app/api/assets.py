@@ -119,13 +119,55 @@ def update_room(room_id: int, item: AssetRoomCreate, db: Session = Depends(get_d
     )
 
 @router.delete("/room/{room_id}")
-def delete_room(room_id: int, db: Session = Depends(get_db), _: User = Depends(require_teacher_or_admin)):
+def delete_room(
+    room_id: int,
+    force: bool = False,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_teacher_or_admin),
+):
     room = db.query(Room).filter(Room.id == room_id).first()
     if not room:
         raise HTTPException(status_code=404, detail="房间不存在")
+
+    from app.models.entities import Inspection, InspectionPhoto, InspectionReviewLog, TaskAssignment
+    from pathlib import Path
+
+    UPLOAD_DIR = Path(__file__).resolve().parents[2] / "storage" / "inspection_photos"
+
+    inspection_count = db.query(Inspection).filter(Inspection.room_id == room_id).count()
+    if inspection_count > 0 and not force:
+        raise HTTPException(
+            status_code=409,
+            detail=f"ROOM_HAS_INSPECTIONS:{inspection_count}",
+        )
+
+    if force and inspection_count > 0:
+        inspections = db.query(Inspection).filter(Inspection.room_id == room_id).all()
+        for insp in inspections:
+            photos = db.query(InspectionPhoto).filter(InspectionPhoto.inspection_id == insp.id).all()
+            for photo in photos:
+                fp = UPLOAD_DIR / photo.object_key
+                fp.unlink(missing_ok=True)
+                db.delete(photo)
+            logs = db.query(InspectionReviewLog).filter(InspectionReviewLog.inspection_id == insp.id).all()
+            for log in logs:
+                db.delete(log)
+            assignment = db.query(TaskAssignment).filter(TaskAssignment.id == insp.assignment_id).first()
+            if assignment:
+                assignment.status = "todo"
+            db.delete(insp)
+
+    assignments = db.query(TaskAssignment).filter(TaskAssignment.room_id == room_id).all()
+    for ta in assignments:
+        db.delete(ta)
+
+    from app.models.entities import Asset as AssetModel
+    for asset in db.query(AssetModel).filter(AssetModel.room_id == room_id).all():
+        db.delete(asset)
+
     db.delete(room)
     db.commit()
-    return {"ok": True}
+    return {"ok": True, "deleted_inspection_count": inspection_count if force else 0}
 
 @router.get("/room/{room_id}/qrcode")
 def get_room_qrcode(room_id: int, db: Session = Depends(get_db)):

@@ -30,14 +30,24 @@ export async function updateRoom(room_id: number, payload: AssetRoomEdit): Promi
   return data as AssetRoomItem;
 }
 
-export async function deleteRoom(room_id: number): Promise<{ ok: boolean }> {
+export async function deleteRoom(room_id: number, force = false): Promise<{ ok: boolean }> {
   const token = getAccessToken();
-  const response = await fetch(`${getBackendBaseUrl()}/assets/room/${room_id}`, {
+  const url = `${getBackendBaseUrl()}/assets/room/${room_id}${force ? "?force=true" : ""}`;
+  const response = await fetch(url, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` }
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(`删除房间失败：${readErrorDetail(data)}`);
+  if (!response.ok) {
+    const detail: string = data?.detail ?? "";
+    if (response.status === 409 && detail.startsWith("ROOM_HAS_INSPECTIONS:")) {
+      const count = parseInt(detail.split(":")[1] || "0");
+      const err = new Error(`ROOM_HAS_INSPECTIONS:${count}`) as Error & { inspectionCount: number };
+      err.inspectionCount = count;
+      throw err;
+    }
+    throw new Error(`删除房间失败：${readErrorDetail(data)}`);
+  }
   return data as { ok: boolean };
 }
 

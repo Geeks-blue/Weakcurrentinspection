@@ -147,8 +147,6 @@ const aiError = ref("");
 const aiRaw = ref("");
 const activePage = ref<ConsolePage>("workspace");
 const workspaceSub = ref<WorkspaceSub>("inspection");
-const previewPhotoUrl = ref("");
-const sidebarCollapsed = ref(false);
 const isLoggedIn = computed(() => Boolean(currentUser.value && getAccessToken()));
 const isReviewer = computed(() =>
   Boolean(currentUser.value && canEnterAdminConsole(currentUser.value.role))
@@ -392,10 +390,6 @@ function switchConsolePage(page: ConsolePage): void {
 
 function switchWorkspaceSub(sub: WorkspaceSub): void {
   workspaceSub.value = sub;
-}
-
-function toggleSidebar(): void {
-  sidebarCollapsed.value = !sidebarCollapsed.value;
 }
 
 function resolvePageFromHash(): ConsolePage {
@@ -772,7 +766,6 @@ function handleLogout(): void {
   confirmDeleteInspectionId.value = null;
   deletingInspectionId.value = null;
   closePhotoPreview();
-  sidebarCollapsed.value = false;
   authMessage.value = "已退出登录。";
   setViewHash("login");
 }
@@ -1021,7 +1014,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="page" :class="{ 'page-logged-in': isLoggedIn, 'sidebar-collapsed': sidebarCollapsed }">
+  <div class="page" :class="{ 'page-logged-in': isLoggedIn }">
     <header class="hero" v-if="isLoggedIn">
       <h1>弱电巡检管理台</h1>
       <p>统一登录后按角色自动分流，支持管理员注册、教师派单和巡检审核。</p>
@@ -1050,12 +1043,9 @@ onMounted(async () => {
     <template v-else>
       <div class="workspace-shell">
         <aside class="workspace-sidebar">
-          <nav class="view-switch" :class="{ collapsed: sidebarCollapsed }">
-        <button class="ghost tab-btn sidebar-toggle-btn" @click="toggleSidebar">
-          {{ sidebarCollapsed ? "展开 »" : "« 收起" }}
-        </button>
+          <nav class="view-switch">
         <button class="ghost tab-btn" :class="{ active: activePage === 'workspace' }" @click="switchConsolePage('workspace')">
-          <span class="sidebar-label">{{ sidebarCollapsed ? "业" : "业务面板" }}</span>
+          业务面板
         </button>
         <button
           v-if="activePage === 'workspace'"
@@ -1063,7 +1053,7 @@ onMounted(async () => {
           :class="{ active: workspaceSub === 'inspection' }"
           @click="switchWorkspaceSub('inspection')"
         >
-          <span class="sidebar-label">{{ sidebarCollapsed ? "检" : "巡检工作台" }}</span>
+          巡检工作台
         </button>
         <button
           v-if="activePage === 'workspace'"
@@ -1071,7 +1061,7 @@ onMounted(async () => {
           :class="{ active: workspaceSub === 'assets' }"
           @click="switchWorkspaceSub('assets')"
         >
-          <span class="sidebar-label">{{ sidebarCollapsed ? "产" : "资产管理" }}</span>
+          资产管理
         </button>
         <button
           v-if="activePage === 'workspace'"
@@ -1079,17 +1069,13 @@ onMounted(async () => {
           :class="{ active: workspaceSub === 'records' }"
           @click="switchWorkspaceSub('records')"
         >
-          <span class="sidebar-label">{{ sidebarCollapsed ? "览" : "巡检记录总览" }}</span>
+          巡检记录总览
         </button>
         <button class="ghost tab-btn" :class="{ active: activePage === 'settings' }" @click="switchConsolePage('settings')">
-          <span class="sidebar-label">{{ sidebarCollapsed ? "设" : "系统设置" }}</span>
+          系统设置
         </button>
-        <button class="ghost" @click="handleLogout">
-          <span class="sidebar-label">{{ sidebarCollapsed ? "退" : "退出登录" }}</span>
-        </button>
-        <span class="status-pill" :class="{ online: isLoggedIn }">
-          {{ sidebarCollapsed ? "在线" : userStatusText }}
-        </span>
+        <button class="ghost" @click="handleLogout">退出登录</button>
+        <span class="status-pill" :class="{ online: isLoggedIn }">{{ userStatusText }}</span>
           </nav>
         </aside>
         <div class="workspace-content">

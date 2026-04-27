@@ -11,7 +11,6 @@
   --layout-max-width: 960px;
   --layout-gutter: 24px;
   --sidebar-width: 220px;
-  --sidebar-width-collapsed: 72px;
 }
 
 * {
@@ -39,12 +38,9 @@ body {
   width: min(calc(var(--layout-max-width) + var(--sidebar-width) + 20px), calc(100vw - var(--layout-gutter) * 2));
 }
 
-.page.page-logged-in.sidebar-collapsed {
-  width: min(calc(var(--layout-max-width) + var(--sidebar-width-collapsed) + 20px), calc(100vw - var(--layout-gutter) * 2));
-}
-
 .workspace-shell {
   display: flex;
+  flex-direction: row-reverse;
   gap: 20px;
   align-items: flex-start;
   margin-top: 16px;
@@ -54,10 +50,6 @@ body {
   flex: 0 0 var(--sidebar-width);
   position: sticky;
   top: 18px;
-}
-
-.sidebar-collapsed .workspace-sidebar {
-  flex-basis: var(--sidebar-width-collapsed);
 }
 
 .workspace-content {
@@ -109,22 +101,10 @@ body {
   box-shadow: 0 10px 28px rgb(14 39 84 / 8%);
 }
 
-.page.page-logged-in.sidebar-collapsed .view-switch {
-  width: auto;
-}
-
 .page.page-logged-in .view-switch .status-pill {
   margin-left: 0;
   justify-content: center;
   width: 100%;
-}
-
-.sidebar-toggle-btn {
-  font-weight: 800;
-}
-
-.view-switch.collapsed .sidebar-label {
-  letter-spacing: 0.05em;
 }
 
 .login-center {
@@ -636,8 +616,7 @@ button.danger {
     padding-top: 14px;
   }
 
-  .page.page-logged-in,
-  .page.page-logged-in.sidebar-collapsed {
+  .page.page-logged-in {
     width: min(var(--layout-max-width), calc(100vw - 16px));
   }
 

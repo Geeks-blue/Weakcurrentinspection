@@ -482,3 +482,52 @@ export async function createTaskAssignment(
 
 export type { DispatchRoomOption, DispatchStudentOption };
 
+export interface UserManageItem {
+  id: number;
+  username: string;
+  role: string;
+  gender: string | null;
+  is_active: boolean;
+}
+
+export interface UpdateUserRequest {
+  role?: string;
+  gender?: string | null;
+  is_active?: boolean;
+  new_password?: string;
+}
+
+export async function listUsers(): Promise<UserManageItem[]> {
+  const token = getAccessToken();
+  const response = await fetch(`${getBackendBaseUrl()}/auth/users`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(`获取用户列表失败：${readErrorDetail(data)}`);
+  return data as UserManageItem[];
+}
+
+export async function updateUser(user_id: number, payload: UpdateUserRequest): Promise<UserManageItem> {
+  const token = getAccessToken();
+  const response = await fetch(`${getBackendBaseUrl()}/auth/users/${user_id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(`更新用户失败：${readErrorDetail(data)}`);
+  return data as UserManageItem;
+}
+
+export async function deleteUser(user_id: number): Promise<void> {
+  const token = getAccessToken();
+  const response = await fetch(`${getBackendBaseUrl()}/auth/users/${user_id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(`删除用户失败：${readErrorDetail(data)}`);
+  }
+}
+

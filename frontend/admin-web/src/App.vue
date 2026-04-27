@@ -12,6 +12,11 @@ import {
   createTaskAssignment,
   deleteTaskAssignment,
   deleteInspectionRecord,
+  deleteUser,
+  listUsers,
+  updateUser,
+  type UserManageItem,
+  type UpdateUserRequest,
   getAccessToken,
   getBackendBaseUrl,
   getConsoleInspections,
@@ -52,7 +57,7 @@ import type {
 } from "./types";
 
 type ConsolePage = "workspace" | "settings";
-type WorkspaceSub = "inspection" | "assets" | "records";
+type WorkspaceSub = "inspection" | "assets" | "records" | "accounts";
 type ViewHash = ConsolePage | "login";
 
 const username = ref("teacher01");
@@ -132,6 +137,19 @@ const editTaskStatus = ref<"todo" | "rejected" | "rectify_required" | "overdue">
 
 const registerLoading = ref(false);
 const registerMessage = ref("");
+
+const users = ref<UserManageItem[]>([]);
+const usersLoading = ref(false);
+const usersError = ref("");
+const usersMessage = ref("");
+const showEditUserDialog = ref(false);
+const editingUser = ref<UserManageItem | null>(null);
+const editUserRole = ref("");
+const editUserGender = ref<"male" | "female" | "">(""); 
+const editUserActive = ref(true);
+const editUserNewPassword = ref("");
+const editUserLoading = ref(false);
+const deletingUserId = ref<number | null>(null);
 const registerUsername = ref("");
 const registerPassword = ref("");
 const registerRole = ref<UserRole>("student");
@@ -390,6 +408,9 @@ function switchConsolePage(page: ConsolePage): void {
 
 function switchWorkspaceSub(sub: WorkspaceSub): void {
   workspaceSub.value = sub;
+  if (sub === "accounts" && users.value.length === 0) {
+    loadUsers();
+  }
 }
 
 function resolvePageFromHash(): ConsolePage {
@@ -940,6 +961,66 @@ async function submitRegisterUser(): Promise<void> {
   }
 }
 
+async function loadUsers(): Promise<void> {
+  usersLoading.value = true;
+  usersError.value = "";
+  try {
+    users.value = await listUsers();
+  } catch (e) {
+    usersError.value = e instanceof Error ? e.message : "获取用户列表失败";
+  } finally {
+    usersLoading.value = false;
+  }
+}
+
+function openEditUserDialog(user: UserManageItem): void {
+  editingUser.value = { ...user };
+  editUserRole.value = user.role;
+  editUserGender.value = (user.gender as "male" | "female" | "") || "";
+  editUserActive.value = user.is_active;
+  editUserNewPassword.value = "";
+  usersMessage.value = "";
+  usersError.value = "";
+  showEditUserDialog.value = true;
+}
+
+async function submitEditUser(): Promise<void> {
+  if (!editingUser.value) return;
+  editUserLoading.value = true;
+  usersError.value = "";
+  try {
+    const payload: UpdateUserRequest = {
+      role: editUserRole.value || undefined,
+      gender: editUserRole.value === "student" ? (editUserGender.value || undefined) : undefined,
+      is_active: editUserActive.value,
+      new_password: editUserNewPassword.value || undefined
+    };
+    await updateUser(editingUser.value.id, payload);
+    usersMessage.value = `用户 ${editingUser.value.username} 已更新`;
+    showEditUserDialog.value = false;
+    await loadUsers();
+  } catch (e) {
+    usersError.value = e instanceof Error ? e.message : "更新失败";
+  } finally {
+    editUserLoading.value = false;
+  }
+}
+
+async function handleDeleteUser(user: UserManageItem): Promise<void> {
+  if (!confirm(`确定删除用户 ${user.username}？此操作不可恢复。`)) return;
+  deletingUserId.value = user.id;
+  usersError.value = "";
+  try {
+    await deleteUser(user.id);
+    usersMessage.value = `用户 ${user.username} 已删除`;
+    await loadUsers();
+  } catch (e) {
+    usersError.value = e instanceof Error ? e.message : "删除失败";
+  } finally {
+    deletingUserId.value = null;
+  }
+}
+
 function saveAiGateway(): void {
   saveAiConfig(aiConfig.value);
   aiError.value = "";
@@ -1067,6 +1148,14 @@ onMounted(async () => {
         >
           巡检记录总览
         </button>
+        <button
+          v-if="activePage === 'workspace' && isAdmin"
+          class="ghost tab-btn sub-tab-btn"
+          :class="{ active: workspaceSub === 'accounts' }"
+          @click="switchWorkspaceSub('accounts')"
+        >
+          账户管理
+        </button>
         <button class="ghost tab-btn" :class="{ active: activePage === 'settings' }" @click="switchConsolePage('settings')">
           系统设置
         </button>
@@ -1141,8 +1230,8 @@ onMounted(async () => {
       </template>
 
       <template v-else>
-        <section class="panel" v-if="isAdmin && workspaceSub === 'inspection'">
-          <h2>管理员账号注册</h2>
+        <section class="panel" v-if="isAdmin && workspaceSub === 'accounts'">
+          <h2>账户管理</h2>
           <p class="hint">该面板仅管理员可见，用于新增学生、教师、运维和管理员账号。</p>
           <div class="grid">
             <div class="row">
@@ -1185,8 +1274,44 @@ onMounted(async () => {
           <p class="hint" v-if="registerMessage">{{ registerMessage }}</p>
         </section>
 
-        <section class="panel" v-if="isReviewer && workspaceSub === 'inspection'">
-          <h2>教师任务派遣</h2>
+        <section class="panel" v-if="isAdmin && workspaceSub === 'accounts'">
+          <h2>用户列表</h2>
+          <div class="actions">
+            <button class="ghost" :disabled="usersLoading" @click="loadUsers">
+              {{ usersLoading ? "加载中..." : "刷新用户列表" }}
+            </button>
+          </div>
+          <p class="hint" v-if="usersMessage">{{ usersMessage }}</p>
+          <p class="error" v-if="usersError">{{ usersError }}</p>
+          <div class="table-wrap" v-if="users.length > 0">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>账号</th>
+                  <th>角色</th>
+                  <th>性别</th>
+                  <th>状态</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="user in users" :key="user.id">
+                  <td>{{ user.username }}</td>
+                  <td>{{ formatRole(user.role) }}</td>
+                  <td>{{ user.gender === 'male' ? '男' : user.gender === 'female' ? '女' : '-' }}</td>
+                  <td><span :class="user.is_active ? 'record-status status-approved' : 'record-status status-rejected'">{{ user.is_active ? '启用' : '禁用' }}</span></td>
+                  <td>
+                    <div class="table-action-group">
+                      <button class="ghost btn-sm" @click="openEditUserDialog(user)">编辑</button>
+                      <button class="danger btn-sm" :disabled="deletingUserId === user.id" @click="handleDeleteUser(user)">{{ deletingUserId === user.id ? '删除中...' : '删除' }}</button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="hint" v-if="!usersLoading && users.length === 0">暂无用户数据，请先创建账号。</p>
+        </section>
           <p class="hint">教师和管理员都可派单，系统会按宿舍楼策略校验是否允许派发。</p>
           <div class="actions">
             <button class="ghost" :disabled="dispatchOptionsLoading" @click="loadDispatchOptions">
@@ -1592,6 +1717,47 @@ onMounted(async () => {
     <div class="photo-lightbox" v-if="previewPhotoUrl" @click.self="closePhotoPreview">
       <button class="photo-lightbox-close" @click="closePhotoPreview">关闭</button>
       <img :src="previewPhotoUrl" alt="巡检照片预览" />
+    </div>
+
+    <!-- 编辑用户弹窗 -->
+    <div v-if="showEditUserDialog && editingUser" class="dialog-mask" @click.self="showEditUserDialog = false">
+      <div class="dialog-panel">
+        <h3>编辑用户：{{ editingUser.username }}</h3>
+        <div class="grid">
+          <div class="row">
+            <label>角色</label>
+            <select v-model="editUserRole">
+              <option value="student">学生</option>
+              <option value="teacher">教师</option>
+              <option value="maintainer">运维</option>
+              <option value="admin">管理员</option>
+            </select>
+          </div>
+          <div class="row" v-if="editUserRole === 'student'">
+            <label>性别</label>
+            <select v-model="editUserGender">
+              <option value="female">女</option>
+              <option value="male">男</option>
+            </select>
+          </div>
+          <div class="row">
+            <label>账号状态</label>
+            <select v-model="editUserActive">
+              <option :value="true">启用</option>
+              <option :value="false">禁用</option>
+            </select>
+          </div>
+          <div class="row">
+            <label>新密码（留空不修改）</label>
+            <input v-model="editUserNewPassword" type="password" placeholder="至少 6 位，留空不修改" />
+          </div>
+        </div>
+        <div class="actions">
+          <button :disabled="editUserLoading" @click="submitEditUser">{{ editUserLoading ? '保存中...' : '保存' }}</button>
+          <button class="ghost" @click="showEditUserDialog = false">取消</button>
+        </div>
+        <p class="error" v-if="usersError">{{ usersError }}</p>
+      </div>
     </div>
 
     <!-- 房间操作弹窗 -->

@@ -47,3 +47,18 @@ class RegisterUserResponse(BaseModel):
     message: str
     user: UserProfile
 
+
+class UserManageItem(BaseModel):
+    id: int
+    username: str
+    role: str
+    gender: str | None
+    is_active: bool
+
+
+class UpdateUserRequest(BaseModel):
+    role: UserRole | None = None
+    gender: UserGender | None = None
+    is_active: bool | None = None
+    new_password: str | None = Field(default=None, min_length=6, max_length=128)
+

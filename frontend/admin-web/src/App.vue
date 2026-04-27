@@ -1015,10 +1015,6 @@ onMounted(async () => {
 
 <template>
   <div class="page" :class="{ 'page-logged-in': isLoggedIn }">
-    <header class="hero" v-if="isLoggedIn">
-      <h1>弱电巡检管理台</h1>
-      <p>统一登录后按角色自动分流，支持管理员注册、教师派单和巡检审核。</p>
-    </header>
 
     <template v-if="!isLoggedIn">
       <div class="login-center">
@@ -1079,6 +1075,10 @@ onMounted(async () => {
           </nav>
         </aside>
         <div class="workspace-content">
+          <header class="hero">
+            <h1>弱电巡检管理台</h1>
+            <p>统一登录后按角色自动分流，支持管理员注册、教师派单和巡检审核。</p>
+          </header>
 
       <template v-if="activePage === 'settings'">
         <section class="panel two-col">

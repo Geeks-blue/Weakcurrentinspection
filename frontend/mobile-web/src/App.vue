@@ -273,7 +273,7 @@ function getLocation(): void {
       settled = true;
       clearTimeout(jsTimeout);
       const msgs: Record<number, string> = {
-        1: "定位权限被拒绝，请在「设置 › Safari › 定位」中选择"允许"后重试",
+        1: "定位权限被拒绝，请在「设置 › Safari › 定位」中选择「允许」后重试",
         2: "定位信号不可用，请移至信号较好处后重试",
         3: "定位超时，请重试或手动输入坐标",
       };

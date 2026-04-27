@@ -168,9 +168,9 @@ body {
 }
 
 button.tab-btn {
-  background: #edf3ff;
+  background: #fff;
   color: #24436f;
-  border: 1px solid #c6d8ff;
+  border: 1px solid #d6e1f2;
 }
 
 button.tab-btn.active {

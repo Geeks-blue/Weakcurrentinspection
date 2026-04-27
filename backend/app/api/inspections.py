@@ -129,7 +129,28 @@ def get_inspection_photo(object_key: str) -> FileResponse:
     return FileResponse(file_path)
 
 
-@router.get("/console-records", response_model=list[ConsoleInspectionItem])
+@router.get("/room-reference-photo")
+def room_reference_photo(
+    room_code: str = Query(...),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    room = db.query(Room).filter(Room.room_code == room_code).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    inspection = (
+        db.query(Inspection)
+        .filter(Inspection.room_id == room.id, Inspection.status == "approved")
+        .order_by(Inspection.submitted_at.desc())
+        .first()
+    )
+    if not inspection:
+        return {"photo_url": None}
+    keys = _list_existing_photo_keys(inspection.id, db)
+    if not keys:
+        return {"photo_url": None}
+    return {"photo_url": _build_photo_url(request, keys[0])}
 def console_records(
     request: Request,
     limit: int = Query(default=120, ge=1, le=500),

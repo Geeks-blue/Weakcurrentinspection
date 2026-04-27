@@ -191,6 +191,16 @@ export async function fetchRoomAssets(room_code: string): Promise<RoomAssetItem[
   return (await response.json()) as RoomAssetItem[];
 }
 
+export async function fetchRoomReferencePhoto(room_code: string): Promise<string | null> {
+  const response = await fetch(
+    `${getBackendUrl()}/inspections/room-reference-photo?room_code=${encodeURIComponent(room_code)}`,
+    { headers: { Authorization: `Bearer ${getToken()}` } }
+  );
+  if (!response.ok) return null;
+  const data = await response.json();
+  return data.photo_url ?? null;
+}
+
 export async function uploadInspectionPhoto(file: Blob, filename: string): Promise<InspectionPhotoUploadResponse> {
   const formData = new FormData();
   formData.append("file", file, filename);

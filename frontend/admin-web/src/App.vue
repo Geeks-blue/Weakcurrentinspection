@@ -187,6 +187,7 @@ const editingAssetId = ref<number | null>(null);
 const showQrcodeDialog = ref(false);
 const qrcodeUrl = ref("");
 const qrcodeTitle = ref("");
+const previewPhotoUrl = ref("");
 const showRoomActionDialog = ref(false);
 const actionRoom = ref<AssetRoomItem | null>(null);
 const showAssetActionDialog = ref(false);

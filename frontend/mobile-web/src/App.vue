@@ -5,6 +5,7 @@ import { computed, onMounted, ref } from "vue";
 import {
   clearToken,
   fetchRoomAssets,
+  fetchRoomReferencePhoto,
   getMe,
   getToken,
   loadMyInspections,
@@ -61,6 +62,7 @@ const qrScanError = ref("");
 const qrScanBusy = ref(false);
 const roomAssets = ref<RoomAssetItem[]>([]);
 const roomAssetsLoading = ref(false);
+const roomReferencePhotoUrl = ref<string | null>(null);
 
 const submitMessage = ref("");
 const submitError = ref("");
@@ -145,7 +147,10 @@ function buildNoCacheUrl(url: string): string {
 }
 
 function pickLatestBackendPhotoUrl(): string {
-  // 严格仅使用后端历史已提交巡检记录中的最新照片。
+  // 优先使用当前房间的历史参考图（已通过审核），其次使用学生自己的历史照片。
+  if (roomReferencePhotoUrl.value) {
+    return roomReferencePhotoUrl.value;
+  }
   for (const inspection of myInspections.value) {
     if (inspection.photo_urls && inspection.photo_urls.length > 0) {
       return inspection.photo_urls[inspection.photo_urls.length - 1];
@@ -381,10 +386,16 @@ async function handleQrScanInput(event: Event): Promise<void> {
 
     roomAssetsLoading.value = true;
     roomAssets.value = [];
+    roomReferencePhotoUrl.value = null;
     try {
-      roomAssets.value = await fetchRoomAssets(roomCode);
+      const [assets, refPhoto] = await Promise.all([
+        fetchRoomAssets(roomCode),
+        fetchRoomReferencePhoto(roomCode),
+      ]);
+      roomAssets.value = assets;
+      roomReferencePhotoUrl.value = refPhoto;
     } catch {
-      // 资产加载失败不阻断签到流程
+      // 资产或参考图加载失败不阻断签到流程
     } finally {
       roomAssetsLoading.value = false;
     }
@@ -562,6 +573,7 @@ function doLogout(): void {
   closePhotoPreview();
   qrScanResult.value = "";
   roomAssets.value = [];
+  roomReferencePhotoUrl.value = null;
   loginMessage.value = "已退出";
 }
 
@@ -725,7 +737,12 @@ onMounted(async () => {
 
       <section class="card camera-card">
         <h2>照片采集</h2>
-        <p class="hint">点击拍照后会调用摄像头；新照片会自动叠加上一张照片作为参考层，并写入时间、弱电巡检、学生名称水印。</p>
+        <p class="hint">请对准房间同一角度拍摄，系统将自动以历史参考图为底层叠加，便于 AI 比对异常。</p>
+
+        <div class="ref-photo-panel" v-if="roomReferencePhotoUrl">
+          <p class="ref-photo-label">📷 历史参考图（请对准此角度拍摄）</p>
+          <img :src="roomReferencePhotoUrl" class="ref-photo-img" alt="历史参考照片" @click="openPhotoPreview(roomReferencePhotoUrl)" />
+        </div>
         <input
           ref="cameraInput"
           class="camera-input"

@@ -18,7 +18,10 @@ export interface TaskItem {
   assignment_id: number;
   task_title: string;
   building_code: string;
+  building_name: string;
   room_code: string;
+  floor_label: string | null;
+  location_text: string | null;
   due_at: string;
   status: string;
 }

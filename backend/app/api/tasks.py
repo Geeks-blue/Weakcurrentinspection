@@ -195,7 +195,10 @@ def my_tasks(
                 assignment_id=assignment.id,
                 task_title=task.title,
                 building_code=building.code,
+                building_name=building.name,
                 room_code=room.room_code,
+                floor_label=room.floor_label,
+                location_text=room.location_text,
                 due_at=assignment.due_at,
                 status=assignment.status,
             )

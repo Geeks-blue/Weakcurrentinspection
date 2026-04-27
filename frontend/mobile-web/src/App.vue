@@ -203,11 +203,20 @@ async function renderWatermarkedPhoto(file: File): Promise<string> {
 
     const now = new Date();
     const watermarkUser = currentUsername.value || username.value.trim() || "学生";
+    const selectedTask = tasks.value.find((t) => t.assignment_id === selectedAssignmentId.value);
+    const locationParts = selectedTask
+      ? [
+          selectedTask.building_name || selectedTask.building_code,
+          selectedTask.floor_label,
+          selectedTask.location_text,
+          selectedTask.room_code,
+        ].filter(Boolean).join(" ")
+      : qrScanResult.value || "弱电巡检";
     context.fillStyle = "rgba(255, 255, 255, 0.96)";
     context.font = `${Math.max(18, Math.round(canvas.width * 0.022))}px "Noto Sans SC", sans-serif`;
     context.textBaseline = "top";
     context.fillText(`时间：${formatWatermarkTime(now)}`, 18, canvas.height - watermarkHeight + 14);
-    context.fillText(`地点：弱电巡检`, 18, canvas.height - watermarkHeight + 42);
+    context.fillText(`地点：${locationParts}`, 18, canvas.height - watermarkHeight + 42);
     context.fillText(`拍摄人：${watermarkUser}`, 18, canvas.height - watermarkHeight + 70);
 
     context.strokeStyle = "rgba(255, 255, 255, 0.65)";

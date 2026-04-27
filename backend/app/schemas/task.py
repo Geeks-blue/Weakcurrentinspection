@@ -16,7 +16,10 @@ class TaskAssignmentItem(BaseModel):
     assignment_id: int
     task_title: str
     building_code: str
+    building_name: str
     room_code: str
+    floor_label: str | None
+    location_text: str | None
     due_at: datetime
     status: str
 

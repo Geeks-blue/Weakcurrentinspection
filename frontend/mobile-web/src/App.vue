@@ -237,24 +237,51 @@ function openQrScanner(): void {
   qrScanInput.value?.click();
 }
 
+const geoManual = ref(false);
+
 function getLocation(): void {
   if (!navigator.geolocation) {
-    geoError.value = "当前浏览器不支持定位";
+    geoError.value = "当前浏览器不支持定位，请手动输入坐标";
+    geoManual.value = true;
     return;
   }
   geoLoading.value = true;
   geoError.value = "";
+  geoManual.value = false;
+
+  let settled = false;
+
+  const jsTimeout = setTimeout(() => {
+    if (settled) return;
+    settled = true;
+    geoLoading.value = false;
+    geoError.value = "定位超时，请检查「设置 › 定位服务」是否已开启后重试，或手动输入坐标";
+    geoManual.value = true;
+  }, 12000);
+
   navigator.geolocation.getCurrentPosition(
     (pos) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(jsTimeout);
       lat.value = pos.coords.latitude.toFixed(6);
       lng.value = pos.coords.longitude.toFixed(6);
       geoLoading.value = false;
     },
     (err) => {
-      geoError.value = err.code === 1 ? "定位权限被拒绝，请在浏览器设置中允许" : `获取定位失败：${err.message}`;
+      if (settled) return;
+      settled = true;
+      clearTimeout(jsTimeout);
+      const msgs: Record<number, string> = {
+        1: "定位权限被拒绝，请在「设置 › Safari › 定位」中选择"允许"后重试",
+        2: "定位信号不可用，请移至信号较好处后重试",
+        3: "定位超时，请重试或手动输入坐标",
+      };
+      geoError.value = msgs[err.code] ?? `获取定位失败（${err.message}）`;
       geoLoading.value = false;
+      geoManual.value = true;
     },
-    { enableHighAccuracy: true, timeout: 10000 }
+    { enableHighAccuracy: false, timeout: 10000, maximumAge: 30000 }
   );
 }
 
@@ -741,6 +768,12 @@ onMounted(async () => {
           <span class="geo-value" v-if="lat && lng">{{ lat }}, {{ lng }}</span>
         </div>
         <p class="error" v-if="geoError">{{ geoError }}</p>
+        <template v-if="geoManual">
+          <label>纬度（手动输入）</label>
+          <input v-model="lat" placeholder="如 23.123456" inputmode="decimal" />
+          <label>经度（手动输入）</label>
+          <input v-model="lng" placeholder="如 113.123456" inputmode="decimal" />
+        </template>
 
         <template v-if="checkinMode === 'manual'">
           <label>手动房间编号</label>

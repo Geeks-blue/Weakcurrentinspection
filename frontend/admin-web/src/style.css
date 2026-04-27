@@ -36,6 +36,8 @@ body {
 
 .page.page-logged-in {
   width: min(calc(var(--layout-max-width) + var(--sidebar-width) + 20px), calc(100vw - var(--layout-gutter) * 2));
+  margin-left: max(var(--layout-gutter), calc((100vw - var(--layout-max-width)) / 2));
+  margin-right: 0;
 }
 
 .workspace-shell {
@@ -94,11 +96,11 @@ body {
   flex-direction: column;
   flex-wrap: nowrap;
   align-items: stretch;
-  padding: 12px;
-  border-radius: 14px;
-  border: 1px solid #d6e1f2;
-  background: #fff;
-  box-shadow: 0 10px 28px rgb(14 39 84 / 8%);
+  padding: 8px 4px;
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
 }
 
 .page.page-logged-in .view-switch .status-pill {

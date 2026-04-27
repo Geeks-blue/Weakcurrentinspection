@@ -4,6 +4,7 @@ import { computed, onMounted, ref } from "vue";
 
 import {
   clearToken,
+  fetchRoomAssets,
   getMe,
   getToken,
   loadMyInspections,
@@ -13,6 +14,7 @@ import {
   submitInspection,
   uploadInspectionPhoto,
   type MyInspectionItem,
+  type RoomAssetItem,
   type TaskItem
 } from "./api";
 
@@ -57,6 +59,8 @@ const qrScanInput = ref<HTMLInputElement | null>(null);
 const qrScanResult = ref("");
 const qrScanError = ref("");
 const qrScanBusy = ref(false);
+const roomAssets = ref<RoomAssetItem[]>([]);
+const roomAssetsLoading = ref(false);
 
 const submitMessage = ref("");
 const submitError = ref("");
@@ -76,10 +80,6 @@ const isStudentLoggedIn = computed(() => currentRole.value === "student" && Bool
 
 const canSubmit = computed(() => {
   if (!selectedAssignmentId.value) {
-    return false;
-  }
-
-  if (!lat.value.trim() || !lng.value.trim()) {
     return false;
   }
 
@@ -369,6 +369,16 @@ async function handleQrScanInput(event: Event): Promise<void> {
     const roomCode = rawValue.startsWith("QR-") ? rawValue.slice(3) : rawValue;
     qrScanResult.value = roomCode;
     manualRoomCode.value = roomCode;
+
+    roomAssetsLoading.value = true;
+    roomAssets.value = [];
+    try {
+      roomAssets.value = await fetchRoomAssets(roomCode);
+    } catch {
+      // 资产加载失败不阻断签到流程
+    } finally {
+      roomAssetsLoading.value = false;
+    }
   } catch (err) {
     qrScanError.value = err instanceof Error ? err.message : "二维码识别失败";
   } finally {
@@ -541,6 +551,8 @@ function doLogout(): void {
   myInspections.value = [];
   clearPhotos();
   closePhotoPreview();
+  qrScanResult.value = "";
+  roomAssets.value = [];
   loginMessage.value = "已退出";
 }
 
@@ -593,8 +605,8 @@ async function submit(): Promise<void> {
     const result = await submitInspection({
       assignment_id: selectedAssignmentId.value,
       checkin_mode: checkinMode.value,
-      checkin_lat: Number(lat.value),
-      checkin_lng: Number(lng.value),
+      checkin_lat: lat.value ? Number(lat.value) : 0,
+      checkin_lng: lng.value ? Number(lng.value) : 0,
       manual_room_code: manualRoomCode.value || undefined,
       door_plate_photo_key: doorPlatePhotoKey.value || undefined,
       lock_state: lockState.value,
@@ -763,6 +775,21 @@ onMounted(async () => {
             </button>
             <div class="qr-scanned-badge" v-if="qrScanResult">✅ 已扫描：{{ qrScanResult }}</div>
             <p class="error" v-if="qrScanError">{{ qrScanError }}</p>
+            <div class="room-assets-panel" v-if="qrScanResult">
+              <p class="room-assets-title">
+                {{ roomAssetsLoading ? "正在加载资产台账..." : `本房间资产台账（${roomAssets.length} 项）` }}
+              </p>
+              <ul class="room-assets-list" v-if="!roomAssetsLoading && roomAssets.length > 0">
+                <li v-for="a in roomAssets" :key="a.asset_code" class="room-asset-item">
+                  <strong>{{ a.asset_name }}</strong>
+                  <span>编码：{{ a.asset_code }}</span>
+                  <span>数量：{{ a.quantity }}</span>
+                  <span v-if="a.model">型号：{{ a.model }}</span>
+                  <span v-if="a.note">备注：{{ a.note }}</span>
+                </li>
+              </ul>
+              <p class="hint" v-if="!roomAssetsLoading && roomAssets.length === 0">该房间暂无资产记录。</p>
+            </div>
           </div>
         </template>
 

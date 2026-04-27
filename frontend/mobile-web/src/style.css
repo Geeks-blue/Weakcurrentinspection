@@ -468,6 +468,48 @@ button.ghost {
   font-size: 0.94rem;
 }
 
+.room-assets-panel {
+  margin-top: 12px;
+  border: 1px solid #d4e0f4;
+  border-radius: 12px;
+  background: #f8fbff;
+  padding: 12px;
+}
+
+.room-assets-title {
+  margin: 0 0 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #24436f;
+}
+
+.room-assets-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.room-asset-item {
+  border: 1px solid #dde8f7;
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px 10px;
+  display: grid;
+  gap: 3px;
+}
+
+.room-asset-item strong {
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.room-asset-item span {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
 @media (max-width: 720px) {
   .mobile-page {
     width: min(var(--layout-max-width), calc(100vw - 24px));

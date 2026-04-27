@@ -7,7 +7,7 @@ from openpyxl import load_workbook
 from sqlalchemy import Column, DateTime, Integer, String
 from sqlalchemy.orm import Session, declarative_base
 
-from app.deps import get_db, require_teacher_or_admin
+from app.deps import get_current_user, get_db, require_teacher_or_admin
 from app.models.entities import Asset, Building, Room, User
 from app.schemas.assets import AssetItemView, AssetRoomCreate, AssetRoomItem, ImportSummary
 
@@ -306,6 +306,39 @@ def list_rooms(
             is_active=room.is_active,
         )
         for room, building in rows
+    ]
+
+
+@router.get("/room-assets/{room_code}", response_model=list[AssetItemView])
+def get_room_assets(
+    room_code: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> list[AssetItemView]:
+    rows = (
+        db.query(Asset, Room, Building)
+        .join(Room, Asset.room_id == Room.id)
+        .join(Building, Room.building_id == Building.id)
+        .filter(Room.room_code == room_code)
+        .order_by(Asset.asset_code.asc())
+        .all()
+    )
+    return [
+        AssetItemView(
+            asset_id=asset.id,
+            asset_code=asset.asset_code,
+            asset_name=asset.asset_name,
+            asset_category=asset.asset_category,
+            building_code=building.code,
+            room_code=room.room_code,
+            quantity=asset.quantity,
+            status=asset.status,
+            manufacturer=asset.manufacturer,
+            model=asset.model,
+            note=asset.note,
+            updated_at=asset.updated_at,
+        )
+        for asset, room, building in rows
     ]
 
 

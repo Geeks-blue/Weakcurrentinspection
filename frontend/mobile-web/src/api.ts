@@ -166,7 +166,27 @@ export async function loadMyInspections(filters?: InspectionQueryFilters): Promi
   return (await response.json()) as MyInspectionItem[];
 }
 
-export async function uploadInspectionPhoto(file: Blob, filename: string): Promise<InspectionPhotoUploadResponse> {
+export interface RoomAssetItem {
+  asset_code: string;
+  asset_name: string;
+  asset_category: string;
+  quantity: number;
+  status: string;
+  manufacturer: string | null;
+  model: string | null;
+  note: string | null;
+}
+
+export async function fetchRoomAssets(room_code: string): Promise<RoomAssetItem[]> {
+  const response = await fetch(
+    `${getBackendUrl()}/assets/room-assets/${encodeURIComponent(room_code)}`,
+    { headers: { Authorization: `Bearer ${getToken()}` } }
+  );
+  if (!response.ok) {
+    throw new Error(`获取资产列表失败: ${response.status}`);
+  }
+  return (await response.json()) as RoomAssetItem[];
+}
   const formData = new FormData();
   formData.append("file", file, filename);
 

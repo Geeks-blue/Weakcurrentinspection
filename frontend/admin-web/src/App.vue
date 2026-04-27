@@ -1523,6 +1523,7 @@ onMounted(async () => {
                 <h3>房间台账（{{ assetRooms.length }}）</h3>
                 <div class="table-header-actions">
                   <button class="ghost btn-sm" :disabled="!selectedRoomId" @click="editSelectedRoom">编辑</button>
+                  <button class="ghost btn-sm" :disabled="!selectedRoomId" @click="() => { const r = assetRooms.find(x => x.room_id === selectedRoomId); if(r) handleShowRoomQrcode(r); }">二维码</button>
                   <button class="danger btn-sm" :disabled="!selectedRoomId" @click="deleteSelectedRoom">删除</button>
                 </div>
               </div>

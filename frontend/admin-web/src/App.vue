@@ -1081,30 +1081,6 @@ onMounted(async () => {
           </header>
 
       <template v-if="activePage === 'settings'">
-        <section class="panel two-col">
-          <div>
-            <h2>固定地址配置</h2>
-            <p class="hint">地址改由配置文件维护，避免在前端页面直接编辑。</p>
-            <div class="row">
-              <label>后端地址</label>
-              <input :value="getBackendBaseUrl()" readonly />
-            </div>
-            <div class="row">
-              <label>移动端地址</label>
-              <input :value="getMobileWebUrl()" readonly />
-            </div>
-          </div>
-
-          <div>
-            <h2>当前会话</h2>
-            <p class="hint">当前登录账号：{{ currentUser?.username }}（{{ formatRole(currentUser?.role || "") }}）</p>
-            <p class="hint">如需切换账号，请先退出后重新登录。</p>
-            <div class="actions">
-              <button class="ghost" @click="handleLogout">退出登录</button>
-            </div>
-          </div>
-        </section>
-
         <section class="panel">
           <h2>AI 接口输入网关</h2>
           <p class="hint">在这里配置接口地址、密钥和模型，然后发送测试提示词。</p>

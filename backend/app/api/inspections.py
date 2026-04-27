@@ -151,6 +151,9 @@ def room_reference_photo(
     if not keys:
         return {"photo_url": None}
     return {"photo_url": _build_photo_url(request, keys[0])}
+
+
+@router.get("/console-records", response_model=list[ConsoleInspectionItem])
 def console_records(
     request: Request,
     limit: int = Query(default=120, ge=1, le=500),

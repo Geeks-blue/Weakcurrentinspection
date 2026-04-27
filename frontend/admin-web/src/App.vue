@@ -1142,50 +1142,6 @@ onMounted(async () => {
 
     <template v-else>
       <div class="workspace-shell">
-        <aside class="workspace-sidebar">
-          <nav class="view-switch">
-        <button class="ghost tab-btn" :class="{ active: activePage === 'workspace' }" @click="switchConsolePage('workspace')">
-          业务面板
-        </button>
-        <button
-          v-if="activePage === 'workspace'"
-          class="ghost tab-btn sub-tab-btn"
-          :class="{ active: workspaceSub === 'inspection' }"
-          @click="switchWorkspaceSub('inspection')"
-        >
-          巡检工作台
-        </button>
-        <button
-          v-if="activePage === 'workspace'"
-          class="ghost tab-btn sub-tab-btn"
-          :class="{ active: workspaceSub === 'assets' }"
-          @click="switchWorkspaceSub('assets')"
-        >
-          资产管理
-        </button>
-        <button
-          v-if="activePage === 'workspace'"
-          class="ghost tab-btn sub-tab-btn"
-          :class="{ active: workspaceSub === 'records' }"
-          @click="switchWorkspaceSub('records')"
-        >
-          巡检记录总览
-        </button>
-        <button
-          v-if="activePage === 'workspace' && isAdmin"
-          class="ghost tab-btn sub-tab-btn"
-          :class="{ active: workspaceSub === 'accounts' }"
-          @click="switchWorkspaceSub('accounts')"
-        >
-          账户管理
-        </button>
-        <button class="ghost tab-btn" :class="{ active: activePage === 'settings' }" @click="switchConsolePage('settings')">
-          系统设置
-        </button>
-        <button class="ghost" @click="handleLogout">退出登录</button>
-        <span class="status-pill" :class="{ online: isLoggedIn }">{{ userStatusText }}</span>
-          </nav>
-        </aside>
         <div class="workspace-content">
           <header class="hero">
             <h1>弱电巡检管理台</h1>
@@ -1743,6 +1699,50 @@ onMounted(async () => {
         </section>
       </template>
         </div>
+        <aside class="workspace-sidebar">
+          <nav class="view-switch">
+        <button class="ghost tab-btn" :class="{ active: activePage === 'workspace' }" @click="switchConsolePage('workspace')">
+          业务面板
+        </button>
+        <button
+          v-if="activePage === 'workspace'"
+          class="ghost tab-btn sub-tab-btn"
+          :class="{ active: workspaceSub === 'inspection' }"
+          @click="switchWorkspaceSub('inspection')"
+        >
+          巡检工作台
+        </button>
+        <button
+          v-if="activePage === 'workspace'"
+          class="ghost tab-btn sub-tab-btn"
+          :class="{ active: workspaceSub === 'assets' }"
+          @click="switchWorkspaceSub('assets')"
+        >
+          资产管理
+        </button>
+        <button
+          v-if="activePage === 'workspace'"
+          class="ghost tab-btn sub-tab-btn"
+          :class="{ active: workspaceSub === 'records' }"
+          @click="switchWorkspaceSub('records')"
+        >
+          巡检记录总览
+        </button>
+        <button
+          v-if="activePage === 'workspace' && isAdmin"
+          class="ghost tab-btn sub-tab-btn"
+          :class="{ active: workspaceSub === 'accounts' }"
+          @click="switchWorkspaceSub('accounts')"
+        >
+          账户管理
+        </button>
+        <button class="ghost tab-btn" :class="{ active: activePage === 'settings' }" @click="switchConsolePage('settings')">
+          系统设置
+        </button>
+        <button class="ghost" @click="handleLogout">退出登录</button>
+        <span class="status-pill" :class="{ online: isLoggedIn }">{{ userStatusText }}</span>
+          </nav>
+        </aside>
       </div>
     </template>
 

@@ -42,7 +42,7 @@ body {
 
 .workspace-shell {
   display: flex;
-  flex-direction: row-reverse;
+  flex-direction: row;
   gap: 20px;
   align-items: flex-start;
   margin-top: 16px;

@@ -372,6 +372,17 @@ button.ghost {
   color: #f5f8ff;
 }
 
+.task-filter-input {
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.task-option-scroll {
+  max-height: 320px;
+  overflow-y: auto;
+  border-radius: 10px;
+}
+
 .task-option-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

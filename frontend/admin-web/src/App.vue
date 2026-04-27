@@ -124,6 +124,23 @@ const pendingTasks = ref<PendingTaskManageItem[]>([]);
 const pendingTasksLoading = ref(false);
 const pendingTasksError = ref("");
 const taskMessage = ref("");
+const pendingTaskFilterTitle = ref("");
+const pendingTaskFilterRoom = ref("");
+const pendingTaskFilterStudent = ref("");
+const pendingTaskFilterStatus = ref("");
+
+const filteredPendingTasks = computed(() => {
+  let list = pendingTasks.value;
+  const title = pendingTaskFilterTitle.value.trim().toLowerCase();
+  const room = pendingTaskFilterRoom.value.trim().toLowerCase();
+  const student = pendingTaskFilterStudent.value.trim().toLowerCase();
+  const status = pendingTaskFilterStatus.value;
+  if (title) list = list.filter(t => t.task_title.toLowerCase().includes(title));
+  if (room) list = list.filter(t => t.room_code.toLowerCase().includes(room) || t.building_code.toLowerCase().includes(room));
+  if (student) list = list.filter(t => t.student_username.toLowerCase().includes(student));
+  if (status) list = list.filter(t => t.status === status);
+  return list;
+});
 const deletingTaskId = ref<number | null>(null);
 const confirmDeleteTaskId = ref<number | null>(null);
 const editingTaskId = ref<number | null>(null);
@@ -1355,6 +1372,30 @@ onMounted(async () => {
 
         <section class="panel" v-if="isReviewer && workspaceSub === 'inspection'">
           <h2>待巡检任务列表</h2>
+          <div class="grid">
+            <div class="row">
+              <label>任务标题</label>
+              <input v-model="pendingTaskFilterTitle" placeholder="搜索标题..." />
+            </div>
+            <div class="row">
+              <label>楼栋/房间</label>
+              <input v-model="pendingTaskFilterRoom" placeholder="搜索楼栋或房间..." />
+            </div>
+            <div class="row">
+              <label>学生账号</label>
+              <input v-model="pendingTaskFilterStudent" placeholder="搜索学生..." />
+            </div>
+            <div class="row">
+              <label>状态</label>
+              <select v-model="pendingTaskFilterStatus">
+                <option value="">全部</option>
+                <option value="todo">待巡检</option>
+                <option value="rejected">驳回</option>
+                <option value="rectify_required">需整改</option>
+                <option value="overdue">已逾期</option>
+              </select>
+            </div>
+          </div>
           <div class="actions">
             <button class="ghost" :disabled="pendingTasksLoading" @click="loadPendingTasks">
               {{ pendingTasksLoading ? "加载中..." : "刷新待巡检任务" }}
@@ -1365,8 +1406,9 @@ onMounted(async () => {
 
           <div class="two-col task-manage-layout">
             <div>
-              <ul class="task-list" v-if="pendingTasks.length > 0">
-                <li v-for="task in pendingTasks" :key="task.assignment_id">
+              <div class="task-list-scroll">
+              <ul class="task-list" v-if="filteredPendingTasks.length > 0">
+                <li v-for="task in filteredPendingTasks" :key="task.assignment_id">
                   <div class="record-head">
                     <strong>ID {{ task.assignment_id }} / {{ task.student_username }}</strong>
                     <span class="record-status" :class="statusClass(task.status)">{{ formatStatus(task.status) }}</span>
@@ -1399,7 +1441,9 @@ onMounted(async () => {
                   </div>
                 </li>
               </ul>
-              <p class="hint" v-else>暂无待巡检任务。</p>
+              <p class="hint" v-if="filteredPendingTasks.length === 0 && pendingTasks.length > 0">无符合条件的任务。</p>
+              <p class="hint" v-if="pendingTasks.length === 0">暂无待巡检任务。</p>
+              </div>
             </div>
 
             <div class="task-edit-card" v-if="editingTaskId">

@@ -28,6 +28,18 @@ const currentUsername = ref("");
 
 const tasks = ref<TaskItem[]>([]);
 const selectedAssignmentId = ref<number | null>(null);
+const taskFilterText = ref("");
+
+const filteredTasks = computed(() => {
+  const q = taskFilterText.value.trim().toLowerCase();
+  if (!q) return tasks.value;
+  return tasks.value.filter(
+    (t) =>
+      t.task_title.toLowerCase().includes(q) ||
+      t.room_code.toLowerCase().includes(q) ||
+      t.building_code.toLowerCase().includes(q)
+  );
+});
 
 const checkinMode = ref<"qr" | "manual">("qr");
 const lat = ref("");
@@ -717,22 +729,25 @@ onMounted(async () => {
 
       <section class="card">
         <h2>待巡检任务</h2>
-        <p class="hint">点击任务卡片即可选中，不再强制使用纵向下拉列表。</p>
-        <div class="task-option-grid" v-if="tasks.length > 0">
-          <button
-            class="task-option-card"
-            :class="{ active: selectedAssignmentId === task.assignment_id }"
-            v-for="task in tasks"
-            :key="task.assignment_id"
-            @click="selectedAssignmentId = task.assignment_id"
-          >
-            <strong>{{ task.task_title }}</strong>
-            <span>{{ task.building_code }} / {{ task.room_code }}</span>
-            <span class="task-status-badge" :class="statusClass(task.status)">{{ formatStatus(task.status) }}</span>
-            <span>截止：{{ new Date(task.due_at).toLocaleString() }}</span>
-          </button>
+        <input class="task-filter-input" v-model="taskFilterText" placeholder="搜索任务标题 / 楼栋 / 房间" />
+        <div class="task-option-scroll" v-if="tasks.length > 0">
+          <div class="task-option-grid">
+            <button
+              class="task-option-card"
+              :class="{ active: selectedAssignmentId === task.assignment_id }"
+              v-for="task in filteredTasks"
+              :key="task.assignment_id"
+              @click="selectedAssignmentId = task.assignment_id"
+            >
+              <strong>{{ task.task_title }}</strong>
+              <span>{{ task.building_code }} / {{ task.room_code }}</span>
+              <span class="task-status-badge" :class="statusClass(task.status)">{{ formatStatus(task.status) }}</span>
+              <span>截止：{{ new Date(task.due_at).toLocaleString() }}</span>
+            </button>
+          </div>
         </div>
         <p class="hint" v-if="tasks.length === 0">暂无可用任务，请先用教师账号分配任务。</p>
+        <p class="hint" v-if="tasks.length > 0 && filteredTasks.length === 0">无符合条件的任务。</p>
       </section>
 
       <section class="card camera-card">

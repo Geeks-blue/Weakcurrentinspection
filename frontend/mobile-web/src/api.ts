@@ -187,6 +187,8 @@ export async function fetchRoomAssets(room_code: string): Promise<RoomAssetItem[
   }
   return (await response.json()) as RoomAssetItem[];
 }
+
+export async function uploadInspectionPhoto(file: Blob, filename: string): Promise<InspectionPhotoUploadResponse> {
   const formData = new FormData();
   formData.append("file", file, filename);
 

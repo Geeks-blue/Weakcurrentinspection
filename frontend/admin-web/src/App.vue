@@ -1312,6 +1312,9 @@ onMounted(async () => {
           </div>
           <p class="hint" v-if="!usersLoading && users.length === 0">暂无用户数据，请先创建账号。</p>
         </section>
+
+        <section class="panel" v-if="isReviewer && workspaceSub === 'inspection'">
+          <h2>教师任务派遣</h2>
           <p class="hint">教师和管理员都可派单，系统会按宿舍楼策略校验是否允许派发。</p>
           <div class="actions">
             <button class="ghost" :disabled="dispatchOptionsLoading" @click="loadDispatchOptions">

@@ -393,12 +393,11 @@ button.danger {
 }
 
 .room-row {
-  cursor: pointer;
   transition: background 0.12s;
 }
 
 .room-row:hover {
-  background: #f0f5ff;
+  background: #f8faff;
 }
 
 .room-row-selected {
@@ -414,6 +413,22 @@ button.danger {
   font-size: 0.82rem;
   font-weight: 600;
   border: 1px solid #c0d2ff;
+}
+
+.asset-count-clickable {
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.asset-count-clickable:hover {
+  background: #ccdcff;
+  border-color: #88aaff;
+}
+
+.asset-count-active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
 }
 
 .room-filter-badge {

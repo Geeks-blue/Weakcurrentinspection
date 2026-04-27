@@ -1529,14 +1529,20 @@ onMounted(async () => {
                       :key="room.room_id"
                       class="room-row"
                       :class="{ 'room-row-selected': selectedRoomCode === room.room_code }"
-                      @click="(e) => { if (!(e.target as Element).closest('button')) selectedRoomCode = selectedRoomCode === room.room_code ? '' : room.room_code }"
                     >
                       <td>{{ room.building_code }}</td>
                       <td>{{ room.room_code }}</td>
                       <td>{{ room.floor_label || "-" }}</td>
                       <td>{{ room.location_text || "-" }}</td>
                       <td>{{ room.is_active ? "启用" : "禁用" }}</td>
-                      <td><span class="asset-count-badge">{{ roomAssetCount[room.room_code] || 0 }} 件</span></td>
+                      <td>
+                        <span
+                          class="asset-count-badge asset-count-clickable"
+                          :class="{ 'asset-count-active': selectedRoomCode === room.room_code }"
+                          @click="selectedRoomCode = selectedRoomCode === room.room_code ? '' : room.room_code"
+                          title="点击筛选该房间资产"
+                        >{{ roomAssetCount[room.room_code] || 0 }} 件</span>
+                      </td>
                       <td>
                         <button class="ghost btn-sm" @click="openRoomActionDialog(room)">操作</button>
                       </td>

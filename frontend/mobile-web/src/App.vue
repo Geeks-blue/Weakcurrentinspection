@@ -27,8 +27,10 @@ const tasks = ref<TaskItem[]>([]);
 const selectedAssignmentId = ref<number | null>(null);
 
 const checkinMode = ref<"qr" | "manual">("qr");
-const lat = ref("23.123456");
-const lng = ref("113.123456");
+const lat = ref("");
+const lng = ref("");
+const geoLoading = ref(false);
+const geoError = ref("");
 const manualRoomCode = ref("");
 const doorPlatePhotoKey = ref("");
 
@@ -233,6 +235,27 @@ function openCameraPicker(): void {
 function openQrScanner(): void {
   qrScanError.value = "";
   qrScanInput.value?.click();
+}
+
+function getLocation(): void {
+  if (!navigator.geolocation) {
+    geoError.value = "当前浏览器不支持定位";
+    return;
+  }
+  geoLoading.value = true;
+  geoError.value = "";
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      lat.value = pos.coords.latitude.toFixed(6);
+      lng.value = pos.coords.longitude.toFixed(6);
+      geoLoading.value = false;
+    },
+    (err) => {
+      geoError.value = err.code === 1 ? "定位权限被拒绝，请在浏览器设置中允许" : `获取定位失败：${err.message}`;
+      geoLoading.value = false;
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
 }
 
 async function handleQrScanInput(event: Event): Promise<void> {
@@ -711,10 +734,13 @@ onMounted(async () => {
           </div>
         </template>
 
-        <label>定位纬度</label>
-        <input v-model="lat" placeholder="23.123456" />
-        <label>定位经度</label>
-        <input v-model="lng" placeholder="113.123456" />
+        <div class="geo-row">
+          <button class="ghost geo-btn" :disabled="geoLoading" @click="getLocation">
+            {{ geoLoading ? "定位中..." : "📍 获取当前位置" }}
+          </button>
+          <span class="geo-value" v-if="lat && lng">{{ lat }}, {{ lng }}</span>
+        </div>
+        <p class="error" v-if="geoError">{{ geoError }}</p>
 
         <template v-if="checkinMode === 'manual'">
           <label>手动房间编号</label>

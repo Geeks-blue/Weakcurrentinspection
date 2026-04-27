@@ -249,11 +249,13 @@ async function handleQrScanInput(event: Event): Promise<void> {
     let rawValue = "";
 
     if ("BarcodeDetector" in window) {
-      const detector = new (window as any).BarcodeDetector({ formats: ["qr_code"] });
-      const bitmap = await createImageBitmap(file);
-      const barcodes = await detector.detect(bitmap);
-      if (barcodes.length > 0) {
-        rawValue = barcodes[0].rawValue;
+      try {
+        const detector = new (window as any).BarcodeDetector({ formats: ["qr_code"] });
+        const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" } as any);
+        const barcodes = await detector.detect(bitmap);
+        if (barcodes.length > 0) rawValue = barcodes[0].rawValue;
+      } catch {
+        // fall through to jsQR
       }
     }
 
@@ -263,27 +265,47 @@ async function handleQrScanInput(event: Event): Promise<void> {
         qrScanError.value = "二维码解析库尚未加载，请刷新页面后重试";
         return;
       }
+
+      // Use imageOrientation to apply EXIF rotation (fixes iOS sideways photos)
+      let bitmap: ImageBitmap;
+      try {
+        bitmap = await createImageBitmap(file, { imageOrientation: "from-image" } as any);
+      } catch {
+        bitmap = await createImageBitmap(file);
+      }
+
+      // Scale down to max 1024px so jsQR can process large camera photos
+      const maxSize = 1024;
+      const scale = Math.min(1, maxSize / Math.max(bitmap.width, bitmap.height));
+      const w = Math.round(bitmap.width * scale);
+      const h = Math.round(bitmap.height * scale);
+
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new Error("无法创建画布");
-      const imageUrl = URL.createObjectURL(file);
-      try {
-        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-          const el = new Image();
-          el.onload = () => resolve(el);
-          el.onerror = () => reject(new Error("图片加载失败"));
-          el.src = imageUrl;
-        });
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-        ctx.drawImage(img, 0, 0);
-      } finally {
-        URL.revokeObjectURL(imageUrl);
-      }
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const result = jsQR(imageData.data, imageData.width, imageData.height);
+
+      canvas.width = w;
+      canvas.height = h;
+      ctx.drawImage(bitmap, 0, 0, w, h);
+
+      let imageData = ctx.getImageData(0, 0, w, h);
+      let result = jsQR(imageData.data, imageData.width, imageData.height);
+
+      // If not found, try 90° clockwise rotation as EXIF fallback
       if (!result) {
-        qrScanError.value = "未识别到二维码，请重新拍摄";
+        const c2 = document.createElement("canvas");
+        c2.width = h;
+        c2.height = w;
+        const ctx2 = c2.getContext("2d")!;
+        ctx2.translate(h / 2, w / 2);
+        ctx2.rotate(Math.PI / 2);
+        ctx2.drawImage(bitmap, -w / 2, -h / 2, w, h);
+        imageData = ctx2.getImageData(0, 0, h, w);
+        result = jsQR(imageData.data, imageData.width, imageData.height);
+      }
+
+      if (!result) {
+        qrScanError.value = "未识别到二维码，请靠近后重新拍摄";
         return;
       }
       rawValue = result.data;
@@ -679,7 +701,7 @@ onMounted(async () => {
         </select>
 
         <template v-if="checkinMode === 'qr'">
-          <input ref="qrScanInput" class="camera-input" type="file" accept="image/*" capture="camera" @change="handleQrScanInput" />
+          <input ref="qrScanInput" class="camera-input" type="file" accept="image/*" capture="environment" @change="handleQrScanInput" />
           <div class="qr-scan-area">
             <button :disabled="qrScanBusy" @click="openQrScanner">
               {{ qrScanBusy ? "识别中..." : "📷 扫描房间二维码" }}

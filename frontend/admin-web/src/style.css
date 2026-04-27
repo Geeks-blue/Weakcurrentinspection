@@ -8,9 +8,9 @@
   --secondary: #2f54eb;
   --line: #d7deea;
   --danger: #d4380d;
-  --layout-max-width: 960px;
+  --layout-max-width: 800px;
   --layout-gutter: 24px;
-  --sidebar-width: 220px;
+  --sidebar-width: 200px;
 }
 
 * {

@@ -372,6 +372,18 @@ button.ghost {
   color: #f5f8ff;
 }
 
+.current-task-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
 .task-filter-input {
   width: 100%;
   margin-bottom: 10px;

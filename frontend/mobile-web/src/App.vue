@@ -739,7 +739,7 @@ onMounted(async () => {
               :key="task.assignment_id"
               @click="selectedAssignmentId = task.assignment_id"
             >
-              <strong>{{ task.task_title }}</strong>
+              <strong>{{ task.task_title }}<span v-if="selectedAssignmentId === task.assignment_id" class="current-task-badge">当前</span></strong>
               <span>{{ task.building_code }} / {{ task.room_code }}</span>
               <span class="task-status-badge" :class="statusClass(task.status)">{{ formatStatus(task.status) }}</span>
               <span>截止：{{ new Date(task.due_at).toLocaleString() }}</span>
@@ -748,56 +748,6 @@ onMounted(async () => {
         </div>
         <p class="hint" v-if="tasks.length === 0">暂无可用任务，请先用教师账号分配任务。</p>
         <p class="hint" v-if="tasks.length > 0 && filteredTasks.length === 0">无符合条件的任务。</p>
-      </section>
-
-      <section class="card camera-card">
-        <h2>照片采集</h2>
-        <p class="hint">请对准房间同一角度拍摄，系统将自动以历史参考图为底层叠加，便于 AI 比对异常。</p>
-
-        <div class="ref-photo-panel" v-if="roomReferencePhotoUrl">
-          <p class="ref-photo-label">📷 历史参考图（请对准此角度拍摄）</p>
-          <img :src="roomReferencePhotoUrl" class="ref-photo-img" alt="历史参考照片" @click="openPhotoPreview(roomReferencePhotoUrl)" />
-        </div>
-        <input
-          ref="cameraInput"
-          class="camera-input"
-          type="file"
-          accept="image/*"
-          capture="environment"
-          @change="handleCameraInput"
-        />
-
-        <div class="photo-toolbar">
-          <button :disabled="photoBusy" @click="openCameraPicker">{{ photoBusy ? "处理中..." : "拍照" }}</button>
-          <button class="ghost" :disabled="capturedPhotos.length === 0" @click="clearPhotos">清空照片</button>
-          <span class="hint">{{ photoStatus }}</span>
-        </div>
-
-        <p class="error" v-if="photoError">{{ photoError }}</p>
-
-        <div class="photo-stage" v-if="capturedPhotos.length > 0">
-          <div class="photo-stage-frame">
-            <img class="photo-stage-image" :src="capturedPhotos[capturedPhotos.length - 1].previewUrl" alt="最新拍摄照片" />
-            <div class="photo-stage-reference" v-if="capturedPhotos.length > 1">
-              <img :src="capturedPhotos[capturedPhotos.length - 2].previewUrl" alt="上一张参考照片" />
-            </div>
-            <div class="photo-stage-label">
-              <span>时间水印已写入</span>
-              <span>弱电巡检 · {{ currentUsername || username }}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="photo-grid" v-if="capturedPhotos.length > 0">
-          <article class="photo-item" v-for="(photo, index) in capturedPhotos" :key="photo.id">
-            <img :src="photo.previewUrl" :alt="`照片 ${index + 1}`" @click="openPhotoPreview(photo.previewUrl)" />
-            <div class="photo-item-meta">
-              <strong>第 {{ index + 1 }} 张</strong>
-              <span>{{ new Date(photo.createdAt).toLocaleString() }}</span>
-            </div>
-            <button class="ghost photo-item-remove" @click="removePhoto(photo.id)">删除</button>
-          </article>
-        </div>
       </section>
 
       <section class="card">
@@ -898,6 +848,56 @@ onMounted(async () => {
         <button :disabled="!canSubmit" @click="submit">提交巡检</button>
         <p class="hint" v-if="submitMessage">{{ submitMessage }}</p>
         <p class="error" v-if="submitError">{{ submitError }}</p>
+      </section>
+
+      <section class="card camera-card">
+        <h2>照片采集</h2>
+        <p class="hint">请对准房间同一角度拍摄，系统将自动以历史参考图为底层叠加，便于 AI 比对异常。</p>
+
+        <div class="ref-photo-panel" v-if="roomReferencePhotoUrl">
+          <p class="ref-photo-label">📷 历史参考图（请对准此角度拍摄）</p>
+          <img :src="roomReferencePhotoUrl" class="ref-photo-img" alt="历史参考照片" @click="openPhotoPreview(roomReferencePhotoUrl)" />
+        </div>
+        <input
+          ref="cameraInput"
+          class="camera-input"
+          type="file"
+          accept="image/*"
+          capture="environment"
+          @change="handleCameraInput"
+        />
+
+        <div class="photo-toolbar">
+          <button :disabled="photoBusy" @click="openCameraPicker">{{ photoBusy ? "处理中..." : "拍照" }}</button>
+          <button class="ghost" :disabled="capturedPhotos.length === 0" @click="clearPhotos">清空照片</button>
+          <span class="hint">{{ photoStatus }}</span>
+        </div>
+
+        <p class="error" v-if="photoError">{{ photoError }}</p>
+
+        <div class="photo-stage" v-if="capturedPhotos.length > 0">
+          <div class="photo-stage-frame">
+            <img class="photo-stage-image" :src="capturedPhotos[capturedPhotos.length - 1].previewUrl" alt="最新拍摄照片" />
+            <div class="photo-stage-reference" v-if="capturedPhotos.length > 1">
+              <img :src="capturedPhotos[capturedPhotos.length - 2].previewUrl" alt="上一张参考照片" />
+            </div>
+            <div class="photo-stage-label">
+              <span>时间水印已写入</span>
+              <span>弱电巡检 · {{ currentUsername || username }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="photo-grid" v-if="capturedPhotos.length > 0">
+          <article class="photo-item" v-for="(photo, index) in capturedPhotos" :key="photo.id">
+            <img :src="photo.previewUrl" :alt="`照片 ${index + 1}`" @click="openPhotoPreview(photo.previewUrl)" />
+            <div class="photo-item-meta">
+              <strong>第 {{ index + 1 }} 张</strong>
+              <span>{{ new Date(photo.createdAt).toLocaleString() }}</span>
+            </div>
+            <button class="ghost photo-item-remove" @click="removePhoto(photo.id)">删除</button>
+          </article>
+        </div>
       </section>
 
       <section class="card">

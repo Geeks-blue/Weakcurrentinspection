@@ -378,7 +378,7 @@ button.ghost {
   padding: 1px 7px;
   border-radius: 999px;
   background: var(--primary);
-  color: #fff;
+  color: #fff !important;
   font-size: 0.75rem;
   font-weight: 700;
   vertical-align: middle;

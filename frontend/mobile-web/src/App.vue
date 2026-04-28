@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 文件说明：该页面是移动端核心交互页面，按中文注释规范维护。
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 
 import {
   clearToken,
@@ -54,6 +54,23 @@ const clutterState = ref<"none" | "stacked_items" | "water" | "odor">("none");
 const indicatorState = ref<"all_ok" | "partial_abnormal" | "all_abnormal">("all_ok");
 const assetMatchState = ref<"matched" | "missing" | "extra" | "moved">("matched");
 const remark = ref("");
+
+watch(selectedAssignmentId, () => {
+  checkinMode.value = "qr";
+  qrScanResult.value = "";
+  qrScanError.value = "";
+  manualRoomCode.value = "";
+  doorPlatePhotoKey.value = "";
+  lockState.value = "locked";
+  clutterState.value = "none";
+  indicatorState.value = "all_ok";
+  assetMatchState.value = "matched";
+  remark.value = "";
+  roomAssets.value = [];
+  roomReferencePhotoUrl.value = null;
+  submitMessage.value = "";
+  submitError.value = "";
+});
 
 type CapturedPhoto = {
   id: string;

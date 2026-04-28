@@ -342,6 +342,7 @@ function closeQrcodeDialog() {
 
 function openRoomActionDialog(room: AssetRoomItem): void {
   selectedRoomId.value = room.room_id;
+  selectedRoomCode.value = room.room_code;
   editingRoom.value = { ...room };
   editingRoomId.value = room.room_id;
   actionRoom.value = room;
@@ -1517,7 +1518,7 @@ onMounted(async () => {
           <p class="hint" v-if="assetMessage">{{ assetMessage }}</p>
           <p class="error" v-if="assetError">{{ assetError }}</p>
 
-          <div class="two-col asset-layout">
+          <div class="asset-stack-layout">
             <div class="table-card">
               <div class="table-card-header">
                 <h3>房间台账（{{ assetRooms.length }}）</h3>
@@ -1554,10 +1555,8 @@ onMounted(async () => {
                       <td>{{ room.is_active ? "启用" : "禁用" }}</td>
                       <td>
                         <span
-                          class="asset-count-badge asset-count-clickable"
+                          class="asset-count-badge"
                           :class="{ 'asset-count-active': selectedRoomCode === room.room_code }"
-                          @click.stop="selectedRoomCode = selectedRoomCode === room.room_code ? '' : room.room_code"
-                          title="点击筛选该房间资产"
                         >{{ roomAssetCount[room.room_code] || 0 }} 件</span>
                       </td>
                     </tr>
@@ -1572,7 +1571,7 @@ onMounted(async () => {
                   资产台账（{{ filteredAssets.length }}<template v-if="selectedRoomCode"> / {{ assets.length }}</template>）
                   <template v-if="selectedRoomCode">
                     <span class="room-filter-badge">{{ selectedRoomCode }}</span>
-                    <button class="ghost btn-sm" style="margin-left:6px" @click="selectedRoomCode = ''">✕</button>
+                    <button class="ghost btn-sm" style="margin-left:6px" @click="selectedRoomCode = ''; selectedRoomId = null">✕</button>
                   </template>
                 </h3>
                 <div class="table-header-actions">

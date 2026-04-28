@@ -208,6 +208,10 @@ const previewPhotoUrl = ref("");
 const showRoomDeleteConfirm = ref(false);
 const deleteConfirmRoomId = ref<number | null>(null);
 const deleteConfirmInspectionCount = ref(0);
+const showPrintDialog = ref(false);
+const printPersonName = ref("");
+const printPersonContact = ref("");
+const printScope = ref<"all" | "selected">("all");
 const actionRoom = ref<AssetRoomItem | null>(null);
 const showAssetActionDialog = ref(false);
 const actionAsset = ref<AssetItemView | null>(null);
@@ -276,6 +280,66 @@ async function confirmForceDeleteRoom() {
   } finally {
     deleteConfirmRoomId.value = null;
   }
+}
+
+function printLabels(): void {
+  const rooms =
+    printScope.value === "selected" && selectedRoomId.value
+      ? assetRooms.value.filter((r) => r.room_id === selectedRoomId.value)
+      : assetRooms.value;
+
+  if (rooms.length === 0) {
+    assetError.value = "没有可打印的房间。";
+    return;
+  }
+
+  const baseUrl = getBackendBaseUrl();
+  const person = printPersonName.value.trim();
+  const contact = printPersonContact.value.trim();
+
+  const labelHtml = rooms
+    .map(
+      (room) => `
+    <div class="label">
+      <img class="qr" src="${baseUrl}/assets/room/${room.room_id}/qrcode" alt="QR" />
+      <div class="info">
+        <div class="building">${room.building_name || room.building_code}</div>
+        <div class="room">${room.room_code}</div>
+        <div class="location">${[room.floor_label, room.location_text].filter(Boolean).join(" · ") || "—"}</div>
+        ${person ? `<div class="person">负责人：${person}</div>` : ""}
+        ${contact ? `<div class="contact">联系：${contact}</div>` : ""}
+      </div>
+    </div>`
+    )
+    .join("");
+
+  const printWin = window.open("", "_blank");
+  if (!printWin) {
+    assetError.value = "请允许浏览器弹出窗口以打印标签。";
+    return;
+  }
+
+  printWin.document.write(`<!DOCTYPE html><html lang="zh-CN"><head>
+<meta charset="UTF-8"><title>房间标签</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Noto Sans SC","Segoe UI",sans-serif;padding:8mm;}
+.labels{display:flex;flex-wrap:wrap;gap:4mm;}
+.label{width:85mm;height:55mm;border:1px solid #aaa;border-radius:3mm;
+  padding:4mm;display:flex;align-items:center;gap:4mm;page-break-inside:avoid;}
+.qr{width:42mm;height:42mm;flex-shrink:0;border-radius:2mm;}
+.info{flex:1;overflow:hidden;}
+.building{font-size:9pt;color:#1a3a6a;font-weight:600;}
+.room{font-size:15pt;font-weight:700;color:#1a3a6a;margin:1.5mm 0;}
+.location{font-size:8.5pt;color:#555;}
+.person,.contact{font-size:8.5pt;color:#333;margin-top:1.5mm;}
+@media print{body{padding:4mm;}.label{border:1px solid #000;}}
+</style></head><body>
+<div class="labels">${labelHtml}</div>
+<script>window.onload=()=>window.print();<\/script>
+</body></html>`);
+  printWin.document.close();
+  showPrintDialog.value = false;
 }
 
 function handleShowRoomQrcode(room: AssetRoomItem) {
@@ -1546,6 +1610,7 @@ onMounted(async () => {
               <div class="table-card-header">
                 <h3>房间台账（{{ assetRooms.length }}）</h3>
                 <div class="table-header-actions">
+                  <button class="ghost btn-sm" @click="showPrintDialog = true">🖨 打印标签</button>
                   <button class="ghost btn-sm" :disabled="!selectedRoomId" @click="editSelectedRoom">编辑</button>
                   <button class="ghost btn-sm" :disabled="!selectedRoomId" @click="() => { const r = assetRooms.find(x => x.room_id === selectedRoomId); if(r) handleShowRoomQrcode(r); }">二维码</button>
                   <button class="danger btn-sm" :disabled="!selectedRoomId" @click="deleteSelectedRoom">删除</button>
@@ -1837,6 +1902,35 @@ onMounted(async () => {
     <div class="photo-lightbox" v-if="previewPhotoUrl" @click.self="closePhotoPreview">
       <button class="photo-lightbox-close" @click="closePhotoPreview">关闭</button>
       <img :src="previewPhotoUrl" alt="巡检照片预览" />
+    </div>
+
+    <!-- 批量打印标签弹窗 -->
+    <div v-if="showPrintDialog" class="dialog-mask" @click.self="showPrintDialog = false">
+      <div class="dialog-panel">
+        <h3>🖨 批量打印房间标签</h3>
+        <div class="grid">
+          <div class="row">
+            <label>负责人姓名</label>
+            <input v-model="printPersonName" placeholder="选填，如：张三" />
+          </div>
+          <div class="row">
+            <label>联系方式</label>
+            <input v-model="printPersonContact" placeholder="选填，如：138xxxxxxxx" />
+          </div>
+          <div class="row">
+            <label>打印范围</label>
+            <select v-model="printScope">
+              <option value="all">全部房间（{{ assetRooms.length }} 间）</option>
+              <option value="selected" :disabled="!selectedRoomId">仅选中房间</option>
+            </select>
+          </div>
+        </div>
+        <p class="hint">标签内容：楼栋名、房间号、楼层/位置、二维码，以及负责人信息（若填写）。</p>
+        <div class="actions">
+          <button @click="printLabels">打印标签</button>
+          <button class="ghost" @click="showPrintDialog = false">取消</button>
+        </div>
+      </div>
     </div>
 
     <!-- 删除房间确认弹窗（有巡检记录时） -->

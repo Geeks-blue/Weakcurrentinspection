@@ -445,7 +445,7 @@ function canEnterAdminConsole(role: string): boolean {
   return role === "teacher" || role === "admin";
 }
 
-function setViewHash(view: ViewHash): void {
+function setViewHash(view: string): void {
   const nextHash = `#${view}`;
   if (window.location.hash !== nextHash) {
     window.location.hash = nextHash;
@@ -454,22 +454,34 @@ function setViewHash(view: ViewHash): void {
 
 function switchConsolePage(page: ConsolePage): void {
   activePage.value = page;
-  setViewHash(page);
+  if (page === "workspace") {
+    setViewHash(`workspace/${workspaceSub.value}`);
+  } else {
+    setViewHash(page);
+  }
 }
 
 function switchWorkspaceSub(sub: WorkspaceSub): void {
   workspaceSub.value = sub;
+  setViewHash(`workspace/${sub}`);
   if (sub === "accounts" && users.value.length === 0) {
     loadUsers();
   }
 }
 
-function resolvePageFromHash(): ConsolePage {
+function resolveStateFromHash(): { page: ConsolePage; sub: WorkspaceSub } {
   const hash = window.location.hash.replace("#", "").trim();
-  if (hash === "settings" || hash === "workspace") {
-    return hash;
+  if (hash === "settings") return { page: "settings", sub: "inspection" };
+  if (hash.startsWith("workspace/")) {
+    const subStr = hash.slice("workspace/".length) as WorkspaceSub;
+    const valid: WorkspaceSub[] = ["inspection", "assets", "records", "accounts"];
+    return { page: "workspace", sub: valid.includes(subStr) ? subStr : "inspection" };
   }
-  return "workspace";
+  return { page: "workspace", sub: "inspection" };
+}
+
+function resolvePageFromHash(): ConsolePage {
+  return resolveStateFromHash().page;
 }
 
 function buildStudentRedirectUrl(token: string): string {
@@ -1136,7 +1148,18 @@ onMounted(async () => {
     }
 
     await Promise.all([loadPendingReviews(), loadDispatchOptions(), loadConsoleInspections(), loadPendingTasks(), loadAssetData()]);
-    switchConsolePage(resolvePageFromHash());
+    const { page, sub } = resolveStateFromHash();
+    activePage.value = page;
+    workspaceSub.value = sub;
+    if (sub === "accounts" && users.value.length === 0) loadUsers();
+
+    window.addEventListener("hashchange", () => {
+      if (!isLoggedIn.value) return;
+      const { page: p, sub: s } = resolveStateFromHash();
+      activePage.value = p;
+      workspaceSub.value = s;
+      if (s === "accounts" && users.value.length === 0) loadUsers();
+    });
   } catch {
     clearAccessToken();
     currentUser.value = null;

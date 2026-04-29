@@ -59,6 +59,7 @@ import type {
 type ConsolePage = "workspace" | "settings";
 type WorkspaceSub = "inspection" | "assets" | "records" | "accounts";
 type ViewHash = ConsolePage | "login";
+type RoomInspectionGroup = { building_code: string; room_code: string; items: ConsoleInspectionItem[] };
 
 const username = ref("teacher01");
 const password = ref("Teacher@123");
@@ -91,7 +92,7 @@ const roomInspectionGroups = computed(() => {
 });
 
 const showRoomRecordsDialog = ref(false);
-const roomRecordsGroup = ref<{ building_code: string; room_code: string; items: ConsoleInspectionItem[] } | null>(null);
+const roomRecordsGroup = ref<RoomInspectionGroup | null>(null);
 const roomAiLoading = ref(false);
 const roomAiResult = ref("");
 const roomAiError = ref("");
@@ -924,7 +925,7 @@ ${item.remark_text ? `巡检备注：${item.remark_text}` : ""}
   }
 }
 
-function openRoomRecords(group: typeof roomInspectionGroups.value[0]): void {
+function openRoomRecords(group: RoomInspectionGroup): void {
   roomRecordsGroup.value = group;
   roomAiResult.value = "";
   roomAiError.value = "";

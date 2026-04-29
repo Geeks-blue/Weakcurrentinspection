@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 文件说明：该页面是移动端核心交互页面，按中文注释规范维护。
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 
 import {
   clearToken,
@@ -584,10 +584,32 @@ async function doLogin(): Promise<void> {
     loginMessage.value = `登录成功：${result.user.username}`;
     await refreshTasks();
     await refreshInspections();
+    startPolling();
   } catch (error) {
     loginMessage.value = error instanceof Error ? error.message : "登录失败";
   } finally {
     loading.value = false;
+  }
+}
+
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+function startPolling(): void {
+  if (pollTimer) return;
+  pollTimer = setInterval(async () => {
+    if (!getToken()) return;
+    try {
+      await refreshTasks();
+    } catch {
+      // 静默失败，不影响用户操作
+    }
+  }, 30000);
+}
+
+function stopPolling(): void {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
   }
 }
 
@@ -603,6 +625,7 @@ function doLogout(): void {
   qrScanResult.value = "";
   roomAssets.value = [];
   roomReferencePhotoUrl.value = null;
+  stopPolling();
   loginMessage.value = "已退出";
 }
 
@@ -701,6 +724,7 @@ onMounted(async () => {
     loginMessage.value = `已恢复登录：${user.username}`;
     await refreshTasks();
     await refreshInspections();
+    startPolling();
   } catch (error) {
     clearToken();
     currentRole.value = "";
@@ -709,6 +733,10 @@ onMounted(async () => {
   } finally {
     loading.value = false;
   }
+});
+
+onUnmounted(() => {
+  stopPolling();
 });
 </script>
 

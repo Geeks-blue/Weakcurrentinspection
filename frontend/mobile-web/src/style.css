@@ -454,6 +454,26 @@ button.ghost {
   flex-wrap: wrap;
 }
 
+.wechat-hint {
+  line-height: 1.6;
+  padding: 8px 12px;
+  background: #f6ffed;
+  border: 1px solid #b7eb8f;
+  border-radius: 8px;
+  color: #237804;
+  font-size: 0.88rem;
+}
+
+.wechat-qr-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.wechat-qr-input {
+  flex: 1;
+}
+
 .qr-scan-area {
   margin-top: 10px;
   display: grid;

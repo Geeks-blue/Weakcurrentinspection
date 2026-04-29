@@ -108,6 +108,8 @@ const photoKeys = computed(() =>
 const doorPlatePhotoOptions = computed(() => capturedPhotos.value.map((item) => item.key));
 
 const isStudentLoggedIn = computed(() => currentRole.value === "student" && Boolean(getToken()));
+const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
+const wechatQrPasteValue = ref("");
 
 const canSubmit = computed(() => {
   if (!selectedAssignmentId.value) {
@@ -278,6 +280,35 @@ function openCameraPicker(): void {
 function openQrScanner(): void {
   qrScanError.value = "";
   qrScanInput.value?.click();
+}
+
+async function applyWechatQrPaste(): Promise<void> {
+  const raw = wechatQrPasteValue.value.trim();
+  if (!raw) {
+    qrScanError.value = "请先粘贴二维码内容";
+    return;
+  }
+  const roomCode = raw.startsWith("QR-") ? raw.slice(3) : raw;
+  qrScanResult.value = roomCode;
+  manualRoomCode.value = roomCode;
+  wechatQrPasteValue.value = "";
+  qrScanError.value = "";
+
+  roomAssetsLoading.value = true;
+  roomAssets.value = [];
+  roomReferencePhotoUrl.value = null;
+  try {
+    const [assets, refPhoto] = await Promise.all([
+      fetchRoomAssets(roomCode),
+      fetchRoomReferencePhoto(roomCode),
+    ]);
+    roomAssets.value = assets;
+    roomReferencePhotoUrl.value = refPhoto;
+  } catch {
+    // 不阻断签到流程
+  } finally {
+    roomAssetsLoading.value = false;
+  }
 }
 
 const geoManual = ref(false);
@@ -767,7 +798,7 @@ onUnmounted(() => {
           <p class="hint">登录成功后可执行任务巡检与记录查询。</p>
         </div>
         <div class="row">
-          <button class="ghost" @click="refreshTasks">刷新任务</button>
+          <button class="ghost" @click="() => { clearPhotos(); refreshTasks(); }">刷新任务</button>
           <button class="ghost" @click="doLogout">退出</button>
         </div>
       </header>
@@ -806,9 +837,21 @@ onUnmounted(() => {
         <template v-if="checkinMode === 'qr'">
           <input ref="qrScanInput" class="camera-input" type="file" accept="image/*" capture="environment" @change="handleQrScanInput" />
           <div class="qr-scan-area">
-            <button :disabled="qrScanBusy" @click="openQrScanner">
-              {{ qrScanBusy ? "识别中..." : "📷 扫描房间二维码" }}
-            </button>
+            <template v-if="isWeChat">
+              <p class="hint wechat-hint">
+                📱 微信浏览器中请使用右上角菜单「扫一扫」扫描门口二维码，<br />
+                复制扫描结果后粘贴到下方输入框。
+              </p>
+              <div class="wechat-qr-row">
+                <input v-model="wechatQrPasteValue" class="wechat-qr-input" placeholder="粘贴二维码内容（如 QR-弱电井-1-1F）" />
+                <button class="ghost" @click="applyWechatQrPaste">确认</button>
+              </div>
+            </template>
+            <template v-else>
+              <button :disabled="qrScanBusy" @click="openQrScanner">
+                {{ qrScanBusy ? "识别中..." : "📷 扫描房间二维码" }}
+              </button>
+            </template>
             <div class="qr-scanned-badge" v-if="qrScanResult">✅ 已扫描：{{ qrScanResult }}</div>
             <p class="error" v-if="qrScanError">{{ qrScanError }}</p>
             <div class="room-assets-panel" v-if="qrScanResult">

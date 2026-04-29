@@ -922,9 +922,6 @@ ${item.remark_text ? `巡检备注：${item.remark_text}` : ""}
   }
 }
 
-  }
-}
-
 function openRoomRecords(group: RoomInspectionGroup): void {
   roomRecordsGroup.value = group;
   roomAiResult.value = "";

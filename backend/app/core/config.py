@@ -22,6 +22,8 @@ class Settings:
         "CORS_ALLOW_ORIGINS",
         "*",
     )
+    wechat_appid: str = os.getenv("WECHAT_APPID", "")
+    wechat_appsecret: str = os.getenv("WECHAT_APPSECRET", "")
 
     @property
     def cors_allow_origins_list(self) -> list[str]:

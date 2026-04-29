@@ -6,6 +6,7 @@ import {
   clearToken,
   fetchRoomAssets,
   fetchRoomReferencePhoto,
+  fetchWxJssdkConfig,
   getMe,
   getToken,
   loadMyInspections,
@@ -110,6 +111,66 @@ const doorPlatePhotoOptions = computed(() => capturedPhotos.value.map((item) => 
 const isStudentLoggedIn = computed(() => currentRole.value === "student" && Boolean(getToken()));
 const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
 const wechatQrPasteValue = ref("");
+const wxReady = ref(false);
+
+async function initWxJssdk(): Promise<void> {
+  if (!isWeChat) return;
+  try {
+    const pageUrl = window.location.href.split("#")[0];
+    const cfg = await fetchWxJssdkConfig(pageUrl);
+    const wx = (window as any).wx;
+    if (!wx) return;
+    wx.config({
+      debug: false,
+      appId: cfg.appId,
+      timestamp: cfg.timestamp,
+      nonceStr: cfg.nonceStr,
+      signature: cfg.signature,
+      jsApiList: ["scanQRCode"],
+    });
+    wx.ready(() => { wxReady.value = true; });
+    wx.error((err: any) => { console.warn("wx.config error", err); });
+  } catch (e) {
+    console.warn("JSSDK init failed", e);
+  }
+}
+
+function wxScanQRCode(): void {
+  const wx = (window as any).wx;
+  if (!wx || !wxReady.value) {
+    qrScanError.value = "微信JSSDK未就绪，请稍后重试";
+    return;
+  }
+  wx.scanQRCode({
+    needResult: 1,
+    scanType: ["qrCode"],
+    success: async (res: any) => {
+      const raw: string = res.resultStr || "";
+      const roomCode = raw.startsWith("QR-") ? raw.slice(3) : raw;
+      qrScanResult.value = roomCode;
+      manualRoomCode.value = roomCode;
+      qrScanError.value = "";
+      roomAssetsLoading.value = true;
+      roomAssets.value = [];
+      roomReferencePhotoUrl.value = null;
+      try {
+        const [assets, refPhoto] = await Promise.all([
+          fetchRoomAssets(roomCode),
+          fetchRoomReferencePhoto(roomCode),
+        ]);
+        roomAssets.value = assets;
+        roomReferencePhotoUrl.value = refPhoto;
+      } catch {
+        // 不阻断流程
+      } finally {
+        roomAssetsLoading.value = false;
+      }
+    },
+    fail: (err: any) => {
+      qrScanError.value = `扫码失败：${err?.errMsg || "未知错误"}`;
+    },
+  });
+}
 
 const canSubmit = computed(() => {
   if (!selectedAssignmentId.value) {
@@ -616,6 +677,7 @@ async function doLogin(): Promise<void> {
     await refreshTasks();
     await refreshInspections();
     startPolling();
+    initWxJssdk();
   } catch (error) {
     loginMessage.value = error instanceof Error ? error.message : "登录失败";
   } finally {
@@ -756,6 +818,7 @@ onMounted(async () => {
     await refreshTasks();
     await refreshInspections();
     startPolling();
+    initWxJssdk();
   } catch (error) {
     clearToken();
     currentRole.value = "";
@@ -838,14 +901,9 @@ onUnmounted(() => {
           <input ref="qrScanInput" class="camera-input" type="file" accept="image/*" capture="environment" @change="handleQrScanInput" />
           <div class="qr-scan-area">
             <template v-if="isWeChat">
-              <p class="hint wechat-hint">
-                📱 微信浏览器中请使用右上角菜单「扫一扫」扫描门口二维码，<br />
-                复制扫描结果后粘贴到下方输入框。
-              </p>
-              <div class="wechat-qr-row">
-                <input v-model="wechatQrPasteValue" class="wechat-qr-input" placeholder="粘贴二维码内容（如 QR-弱电井-1-1F）" />
-                <button class="ghost" @click="applyWechatQrPaste">确认</button>
-              </div>
+              <button @click="wxScanQRCode" :disabled="!wxReady">
+                {{ wxReady ? "📷 微信扫一扫" : "JSSDK 初始化中..." }}
+              </button>
             </template>
             <template v-else>
               <button :disabled="qrScanBusy" @click="openQrScanner">

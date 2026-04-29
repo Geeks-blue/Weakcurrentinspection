@@ -191,6 +191,17 @@ export async function fetchRoomAssets(room_code: string): Promise<RoomAssetItem[
   return (await response.json()) as RoomAssetItem[];
 }
 
+export async function fetchWxJssdkConfig(url: string): Promise<{
+  appId: string; timestamp: number; nonceStr: string; signature: string;
+}> {
+  const response = await fetch(
+    `${getBackendUrl()}/wechat/jssdk-config?url=${encodeURIComponent(url)}`,
+    { headers: { Authorization: `Bearer ${getToken()}` } }
+  );
+  if (!response.ok) throw new Error("获取微信JSSDK配置失败");
+  return response.json();
+}
+
 export async function fetchRoomReferencePhoto(room_code: string): Promise<string | null> {
   const response = await fetch(
     `${getBackendUrl()}/inspections/room-reference-photo?room_code=${encodeURIComponent(room_code)}`,

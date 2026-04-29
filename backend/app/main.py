@@ -8,6 +8,7 @@ from app.api.auth import router as auth_router
 from app.api.inspections import router as inspections_router
 from app.api.policy import router as policy_router
 from app.api.tasks import router as tasks_router
+from app.api.wechat import router as wechat_router
 from app.bootstrap import init_db_and_seed
 from app.core.config import settings
 
@@ -42,4 +43,5 @@ app.include_router(tasks_router, prefix="/tasks", tags=["tasks"])
 app.include_router(inspections_router, prefix="/inspections", tags=["inspections"])
 app.include_router(assets_router, prefix="/assets", tags=["assets"])
 app.include_router(ai_router, prefix="/ai", tags=["ai"])
+app.include_router(wechat_router, prefix="/wechat", tags=["wechat"])
 

@@ -900,16 +900,9 @@ onUnmounted(() => {
         <template v-if="checkinMode === 'qr'">
           <input ref="qrScanInput" class="camera-input" type="file" accept="image/*" capture="environment" @change="handleQrScanInput" />
           <div class="qr-scan-area">
-            <template v-if="isWeChat">
-              <button @click="wxScanQRCode" :disabled="!wxReady">
-                {{ wxReady ? "📷 微信扫一扫" : "JSSDK 初始化中..." }}
-              </button>
-            </template>
-            <template v-else>
-              <button :disabled="qrScanBusy" @click="openQrScanner">
-                {{ qrScanBusy ? "识别中..." : "📷 扫描房间二维码" }}
-              </button>
-            </template>
+            <button :disabled="qrScanBusy" @click="openQrScanner">
+              {{ qrScanBusy ? "识别中..." : "📷 扫描房间二维码" }}
+            </button>
             <div class="qr-scanned-badge" v-if="qrScanResult">✅ 已扫描：{{ qrScanResult }}</div>
             <p class="error" v-if="qrScanError">{{ qrScanError }}</p>
             <div class="room-assets-panel" v-if="qrScanResult">

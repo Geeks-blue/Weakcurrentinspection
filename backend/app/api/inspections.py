@@ -205,6 +205,11 @@ def console_records(
                 submitted_at=inspection.submitted_at,
                 reviewed_at=inspection.reviewed_at,
                 status=inspection.status,
+                lock_state=inspection.lock_state,
+                clutter_state=inspection.clutter_state,
+                indicator_state=inspection.indicator_state,
+                asset_match_state=inspection.asset_match_state,
+                remark_text=inspection.remark_text,
                 photo_count=photo_count,
                 photo_urls=_list_photo_urls(request, inspection.id, db) if request else [],
             )

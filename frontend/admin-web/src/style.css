@@ -648,6 +648,25 @@ button.danger {
   margin-top: 4px;
 }
 
+.detail-grid {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.detail-row {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.detail-label {
+  flex: 0 0 80px;
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
 @media (max-width: 600px) {
   .dialog-two-col {
     grid-template-columns: 1fr;

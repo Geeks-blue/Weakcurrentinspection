@@ -125,6 +125,11 @@ export interface ConsoleInspectionItem {
   submitted_at: string;
   reviewed_at: string | null;
   status: string;
+  lock_state: string;
+  clutter_state: string;
+  indicator_state: string;
+  asset_match_state: string;
+  remark_text: string | null;
   photo_count: number;
   photo_urls: string[];
 }

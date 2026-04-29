@@ -77,6 +77,12 @@ const consoleFilterRoomCode = ref("");
 const consoleFilterUsername = ref("");
 const consoleFilterFrom = ref("");
 const consoleFilterTo = ref("");
+
+const showInspectionDetailDialog = ref(false);
+const detailItem = ref<ConsoleInspectionItem | null>(null);
+const detailAiLoading = ref(false);
+const detailAiResult = ref("");
+const detailAiError = ref("");
 const deletingInspectionId = ref<number | null>(null);
 const confirmDeleteInspectionId = ref<number | null>(null);
 const selectedInspectionId = ref<number | null>(null);
@@ -843,6 +849,58 @@ async function requestDeleteInspection(inspectionId: number): Promise<void> {
 
 function cancelDeleteInspection(): void {
   confirmDeleteInspectionId.value = null;
+}
+
+function openInspectionDetail(item: ConsoleInspectionItem): void {
+  detailItem.value = item;
+  detailAiResult.value = "";
+  detailAiError.value = "";
+  showInspectionDetailDialog.value = true;
+}
+
+async function requestAiAnalysis(): Promise<void> {
+  if (!detailItem.value) return;
+  const item = detailItem.value;
+
+  const lockMap: Record<string, string> = { locked: "已锁", unlocked: "未锁", lock_damaged: "门锁损坏" };
+  const clutterMap: Record<string, string> = { none: "无杂物", stacked_items: "有堆放物品", water: "有积水", odor: "有异味" };
+  const indicatorMap: Record<string, string> = { all_ok: "全部正常", partial_abnormal: "个别异常", all_abnormal: "全部异常" };
+  const assetMap: Record<string, string> = { matched: "与台账一致", missing: "资产缺失", extra: "资产多余", moved: "位置变动" };
+
+  const prompt = `以下是一条弱电机房巡检记录，请根据巡检结果给出专业的风险评估和整改建议：
+房间：${item.building_code} / ${item.room_code}
+巡检状态：${item.status}
+锁闭状态：${lockMap[item.lock_state] || item.lock_state}
+环境杂物：${clutterMap[item.clutter_state] || item.clutter_state}
+设备指示灯：${indicatorMap[item.indicator_state] || item.indicator_state}
+资产核对：${assetMap[item.asset_match_state] || item.asset_match_state}
+照片数量：${item.photo_count} 张
+${item.remark_text ? `巡检备注：${item.remark_text}` : ""}
+提交时间：${new Date(item.submitted_at).toLocaleString()}
+
+请给出：1.风险等级（低/中/高）2.主要风险点 3.整改建议`;
+
+  detailAiLoading.value = true;
+  detailAiError.value = "";
+  detailAiResult.value = "";
+  try {
+    const output = await callAiGateway({
+      mode: aiConfig.value.mode,
+      backendBaseUrl: getBackendBaseUrl(),
+      accessToken: getAccessToken(),
+      endpoint: aiConfig.value.endpoint,
+      apiKey: aiConfig.value.apiKey,
+      model: aiConfig.value.model,
+      systemPrompt: "你是弱电机房巡检专家，请根据巡检数据给出简洁专业的风险分析和整改建议。",
+      userPrompt: prompt,
+      temperature: 0.3,
+    });
+    detailAiResult.value = output.text;
+  } catch (e) {
+    detailAiError.value = e instanceof Error ? e.message : "AI 分析失败";
+  } finally {
+    detailAiLoading.value = false;
+  }
 }
 
 async function handleLogin(): Promise<void> {
@@ -1821,6 +1879,7 @@ onMounted(async () => {
                 />
               </div>
               <div class="actions">
+                <button class="ghost" @click="openInspectionDetail(item)">详情 / AI分析</button>
                 <button
                   class="danger"
                   :disabled="deletingInspectionId === item.inspection_id"
@@ -1898,6 +1957,36 @@ onMounted(async () => {
         </aside>
       </div>
     </template>
+
+    <!-- 巡检详情 + AI分析弹窗 -->
+    <div v-if="showInspectionDetailDialog && detailItem" class="dialog-mask" @click.self="showInspectionDetailDialog = false">
+      <div class="dialog-panel dialog-panel-wide">
+        <h3>巡检详情 · ID {{ detailItem.inspection_id }}</h3>
+        <div class="detail-grid">
+          <div class="detail-row"><span class="detail-label">学生</span><span>{{ detailItem.student_username }}</span></div>
+          <div class="detail-row"><span class="detail-label">房间</span><span>{{ detailItem.building_code }} / {{ detailItem.room_code }}</span></div>
+          <div class="detail-row"><span class="detail-label">状态</span><span class="record-status" :class="statusClass(detailItem.status)">{{ formatStatus(detailItem.status) }}</span></div>
+          <div class="detail-row"><span class="detail-label">锁闭</span><span>{{ formatLockState(detailItem.lock_state) }}</span></div>
+          <div class="detail-row"><span class="detail-label">环境杂物</span><span>{{ formatClutterState(detailItem.clutter_state) }}</span></div>
+          <div class="detail-row"><span class="detail-label">设备指示灯</span><span>{{ formatIndicatorState(detailItem.indicator_state) }}</span></div>
+          <div class="detail-row"><span class="detail-label">资产核对</span><span>{{ formatAssetMatchState(detailItem.asset_match_state) }}</span></div>
+          <div class="detail-row" v-if="detailItem.remark_text"><span class="detail-label">备注</span><span>{{ detailItem.remark_text }}</span></div>
+          <div class="detail-row"><span class="detail-label">提交时间</span><span>{{ new Date(detailItem.submitted_at).toLocaleString() }}</span></div>
+          <div class="detail-row" v-if="detailItem.reviewed_at"><span class="detail-label">审核时间</span><span>{{ new Date(detailItem.reviewed_at).toLocaleString() }}</span></div>
+        </div>
+        <div class="photo-preview-grid" v-if="detailItem.photo_urls.length > 0">
+          <img v-for="url in detailItem.photo_urls" :key="url" :src="url" alt="巡检照片" @click="openPhotoPreview(url)" />
+        </div>
+        <div class="actions">
+          <button :disabled="detailAiLoading" @click="requestAiAnalysis">
+            {{ detailAiLoading ? "分析中..." : "🤖 AI 分析建议" }}
+          </button>
+          <button class="ghost" @click="showInspectionDetailDialog = false">关闭</button>
+        </div>
+        <p class="error" v-if="detailAiError">{{ detailAiError }}</p>
+        <pre class="result" v-if="detailAiResult">{{ detailAiResult }}</pre>
+      </div>
+    </div>
 
     <div class="photo-lightbox" v-if="previewPhotoUrl" @click.self="closePhotoPreview">
       <button class="photo-lightbox-close" @click="closePhotoPreview">关闭</button>

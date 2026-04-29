@@ -90,6 +90,11 @@ class ConsoleInspectionItem(BaseModel):
     submitted_at: datetime
     reviewed_at: datetime | None
     status: str
+    lock_state: str
+    clutter_state: str
+    indicator_state: str
+    asset_match_state: str
+    remark_text: str | None
     photo_count: int
     photo_urls: list[str]
 

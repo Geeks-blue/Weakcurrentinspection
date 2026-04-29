@@ -78,6 +78,24 @@ const consoleFilterUsername = ref("");
 const consoleFilterFrom = ref("");
 const consoleFilterTo = ref("");
 
+const roomInspectionGroups = computed(() => {
+  const map = new Map<string, { building_code: string; room_code: string; items: ConsoleInspectionItem[] }>();
+  for (const item of consoleInspections.value) {
+    const key = `${item.building_code}||${item.room_code}`;
+    if (!map.has(key)) {
+      map.set(key, { building_code: item.building_code, room_code: item.room_code, items: [] });
+    }
+    map.get(key)!.items.push(item);
+  }
+  return Array.from(map.values()).sort((a, b) => a.room_code.localeCompare(b.room_code));
+});
+
+const showRoomRecordsDialog = ref(false);
+const roomRecordsGroup = ref<{ building_code: string; room_code: string; items: ConsoleInspectionItem[] } | null>(null);
+const roomAiLoading = ref(false);
+const roomAiResult = ref("");
+const roomAiError = ref("");
+
 const showInspectionDetailDialog = ref(false);
 const detailItem = ref<ConsoleInspectionItem | null>(null);
 const detailAiLoading = ref(false);
@@ -900,6 +918,52 @@ ${item.remark_text ? `巡检备注：${item.remark_text}` : ""}
     detailAiError.value = e instanceof Error ? e.message : "AI 分析失败";
   } finally {
     detailAiLoading.value = false;
+  }
+}
+
+  }
+}
+
+function openRoomRecords(group: typeof roomInspectionGroups.value[0]): void {
+  roomRecordsGroup.value = group;
+  roomAiResult.value = "";
+  roomAiError.value = "";
+  showRoomRecordsDialog.value = true;
+}
+
+async function requestRoomAiAnalysis(): Promise<void> {
+  if (!roomRecordsGroup.value) return;
+  const group = roomRecordsGroup.value;
+  const lockMap: Record<string, string> = { locked: "已锁", unlocked: "未锁", lock_damaged: "门锁损坏" };
+  const clutterMap: Record<string, string> = { none: "无杂物", stacked_items: "有堆放物品", water: "有积水", odor: "有异味" };
+  const indicatorMap: Record<string, string> = { all_ok: "全部正常", partial_abnormal: "个别异常", all_abnormal: "全部异常" };
+  const assetMap: Record<string, string> = { matched: "与台账一致", missing: "资产缺失", extra: "资产多余", moved: "位置变动" };
+  const recordsSummary = group.items.map((item, i) =>
+    `记录${i + 1}（${new Date(item.submitted_at).toLocaleDateString()}）：状态=${formatStatus(item.status)}，锁闭=${lockMap[item.lock_state] || item.lock_state}，杂物=${clutterMap[item.clutter_state] || item.clutter_state}，指示灯=${indicatorMap[item.indicator_state] || item.indicator_state}，资产=${assetMap[item.asset_match_state] || item.asset_match_state}${item.remark_text ? '，备注:' + item.remark_text : ''}`
+  ).join("\n");
+
+  const prompt = `以下是弱电机房「${group.building_code} / ${group.room_code}」的全部巡检记录（共 ${group.items.length} 条），请综合分析并给出整体评估：\n${recordsSummary}\n\n请给出：1.整体健康状态评分（0-100）2.主要风险趋势 3.近期整改优先项`;
+
+  roomAiLoading.value = true;
+  roomAiError.value = "";
+  roomAiResult.value = "";
+  try {
+    const output = await callAiGateway({
+      mode: aiConfig.value.mode,
+      backendBaseUrl: getBackendBaseUrl(),
+      accessToken: getAccessToken(),
+      endpoint: aiConfig.value.endpoint,
+      apiKey: aiConfig.value.apiKey,
+      model: aiConfig.value.model,
+      systemPrompt: "你是弱电机房运维专家，根据多条历史巡检记录，给出房间整体运行状况评估和优先整改建议。",
+      userPrompt: prompt,
+      temperature: 0.3,
+    });
+    roomAiResult.value = output.text;
+  } catch (e) {
+    roomAiError.value = e instanceof Error ? e.message : "AI 分析失败";
+  } finally {
+    roomAiLoading.value = false;
   }
 }
 
@@ -1818,96 +1882,32 @@ onMounted(async () => {
         </section>
 
         <section class="panel" v-if="isReviewer && workspaceSub === 'records'">
-          <h2>巡检记录总览（控制台）</h2>
-          <div class="grid">
-            <div class="row">
-              <label>状态筛选</label>
-              <select v-model="consoleFilterStatus">
-                <option value="">全部状态</option>
-                <option value="pending_review">待审核</option>
-                <option value="approved">已通过</option>
-                <option value="rejected">已驳回</option>
-                <option value="rectify_required">需整改</option>
-              </select>
-            </div>
-            <div class="row">
-              <label>弱电间编号</label>
-              <input v-model="consoleFilterRoomCode" placeholder="如 dorm-2-R1" />
-            </div>
-            <div class="row">
-              <label>学生账号</label>
-              <input v-model="consoleFilterUsername" placeholder="如 student_f01" />
-            </div>
-            <div class="row">
-              <label>提交开始时间</label>
-              <input v-model="consoleFilterFrom" type="datetime-local" />
-            </div>
-            <div class="row">
-              <label>提交结束时间</label>
-              <input v-model="consoleFilterTo" type="datetime-local" />
-            </div>
-          </div>
+          <h2>巡检记录总览（按房间）</h2>
           <div class="actions">
             <button :disabled="consoleLoading" @click="loadConsoleInspections">
-              {{ consoleLoading ? "加载中..." : "🔍 筛选查询" }}
-            </button>
-            <button class="ghost" @click="() => { consoleFilterStatus = ''; consoleFilterRoomCode = ''; consoleFilterUsername = ''; consoleFilterFrom = ''; consoleFilterTo = ''; loadConsoleInspections(); }">
-              清空筛选
+              {{ consoleLoading ? "加载中..." : "刷新数据" }}
             </button>
           </div>
           <p class="error" v-if="consoleError">{{ consoleError }}</p>
-
-          <ul class="task-list" v-if="consoleInspections.length > 0">
-            <li v-for="item in consoleInspections" :key="item.inspection_id">
-              <div class="record-head">
-                <strong>ID {{ item.inspection_id }} / {{ item.student_username }}</strong>
-                <span class="record-status" :class="statusClass(item.status)">{{ formatStatus(item.status) }}</span>
+          <div class="room-card-grid" v-if="roomInspectionGroups.length > 0">
+            <div
+              class="room-card"
+              v-for="group in roomInspectionGroups"
+              :key="group.building_code + group.room_code"
+              @click="openRoomRecords(group)"
+            >
+              <div class="room-card-building">{{ group.building_code }}</div>
+              <div class="room-card-code">{{ group.room_code }}</div>
+              <div class="room-card-stats">
+                <span>{{ group.items.length }} 条记录</span>
+                <span
+                  class="record-status"
+                  :class="statusClass(group.items[0].status)"
+                >{{ formatStatus(group.items[0].status) }}</span>
               </div>
-              <div class="record-meta-grid">
-                <span>{{ item.building_code }} / {{ item.room_code }}</span>
-                <span>照片: {{ item.photo_count }}</span>
-                <span>提交时间: {{ new Date(item.submitted_at).toLocaleString() }}</span>
-                <span v-if="item.reviewed_at">审核时间: {{ new Date(item.reviewed_at).toLocaleString() }}</span>
-              </div>
-              <div class="photo-preview-grid" v-if="item.photo_urls.length > 0">
-                <img
-                  v-for="photoUrl in item.photo_urls"
-                  :key="photoUrl"
-                  :src="photoUrl"
-                  alt="巡检照片"
-                  @click="openPhotoPreview(photoUrl)"
-                />
-              </div>
-              <div class="actions">
-                <button class="ghost" @click="openInspectionDetail(item)">详情 / AI分析</button>
-                <button
-                  class="danger"
-                  :disabled="deletingInspectionId === item.inspection_id"
-                  @click="requestDeleteInspection(item.inspection_id)"
-                >
-                  {{
-                    deletingInspectionId === item.inspection_id
-                      ? "删除中..."
-                      : confirmDeleteInspectionId === item.inspection_id
-                        ? "再次点击确认删除"
-                        : "删除记录"
-                  }}
-                </button>
-                <button
-                  class="ghost"
-                  v-if="confirmDeleteInspectionId === item.inspection_id"
-                  :disabled="deletingInspectionId === item.inspection_id"
-                  @click="cancelDeleteInspection"
-                >
-                  取消
-                </button>
-                <span class="hint danger-hint" v-if="confirmDeleteInspectionId === item.inspection_id">
-                  二次确认：删除后将清理该记录关联照片与审核日志，且不可恢复。
-                </span>
-              </div>
-            </li>
-          </ul>
-          <p class="hint" v-else>暂无巡检记录。</p>
+            </div>
+          </div>
+          <p class="hint" v-else>暂无巡检记录，请先筛选查询。</p>
         </section>
       </template>
         </div>
@@ -1957,6 +1957,45 @@ onMounted(async () => {
         </aside>
       </div>
     </template>
+
+    <!-- 房间巡检记录 + 整体AI分析弹窗 -->
+    <div v-if="showRoomRecordsDialog && roomRecordsGroup" class="dialog-mask" @click.self="showRoomRecordsDialog = false">
+      <div class="dialog-panel dialog-panel-wide">
+        <h3>{{ roomRecordsGroup.building_code }} / {{ roomRecordsGroup.room_code }} · {{ roomRecordsGroup.items.length }} 条记录</h3>
+        <div class="actions">
+          <button :disabled="roomAiLoading" @click="requestRoomAiAnalysis">
+            {{ roomAiLoading ? "分析中..." : "🤖 AI 整体分析" }}
+          </button>
+          <button class="ghost" @click="showRoomRecordsDialog = false">关闭</button>
+        </div>
+        <p class="error" v-if="roomAiError">{{ roomAiError }}</p>
+        <pre class="result" v-if="roomAiResult">{{ roomAiResult }}</pre>
+        <ul class="task-list" style="margin-top:14px">
+          <li v-for="item in roomRecordsGroup.items" :key="item.inspection_id">
+            <div class="record-head">
+              <strong>ID {{ item.inspection_id }} / {{ item.student_username }}</strong>
+              <span class="record-status" :class="statusClass(item.status)">{{ formatStatus(item.status) }}</span>
+            </div>
+            <div class="record-meta-grid">
+              <span>提交：{{ new Date(item.submitted_at).toLocaleString() }}</span>
+              <span>照片：{{ item.photo_count }}</span>
+              <span>锁闭：{{ formatLockState(item.lock_state) }}</span>
+              <span>杂物：{{ formatClutterState(item.clutter_state) }}</span>
+            </div>
+            <div class="photo-preview-grid" v-if="item.photo_urls.length > 0">
+              <img v-for="u in item.photo_urls" :key="u" :src="u" alt="照片" @click="openPhotoPreview(u)" />
+            </div>
+            <div class="actions">
+              <button class="ghost btn-sm" @click="openInspectionDetail(item)">详情/AI</button>
+              <button class="danger btn-sm" :disabled="deletingInspectionId === item.inspection_id" @click="requestDeleteInspection(item.inspection_id)">
+                {{ deletingInspectionId === item.inspection_id ? "删除中..." : confirmDeleteInspectionId === item.inspection_id ? "确认删除" : "删除" }}
+              </button>
+              <button class="ghost btn-sm" v-if="confirmDeleteInspectionId === item.inspection_id" @click="cancelDeleteInspection">取消</button>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
 
     <!-- 巡检详情 + AI分析弹窗 -->
     <div v-if="showInspectionDetailDialog && detailItem" class="dialog-mask" @click.self="showInspectionDetailDialog = false">

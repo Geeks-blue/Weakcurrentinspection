@@ -57,10 +57,6 @@ async def proxy_chat(
             ),
             {"role": "user", "content": payload.user_prompt},
         ],
-        "metadata": {
-            "request_user": current_user.username,
-            "request_role": current_user.role,
-        },
     }
 
     timeout = httpx.Timeout(settings.ai_proxy_timeout_seconds)
@@ -74,10 +70,25 @@ async def proxy_chat(
                     "Authorization": f"Bearer {api_key}",
                 },
             )
+        except httpx.ConnectError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"无法连接 AI 服务（ConnectError）：{exc}。请检查服务器是否能访问 {payload.endpoint}",
+            ) from exc
+        except httpx.TimeoutException as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"AI 服务请求超时（{settings.ai_proxy_timeout_seconds}s）：{exc}",
+            ) from exc
         except httpx.HTTPError as exc:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"AI upstream request failed: {exc}",
+                detail=f"AI upstream request failed: {type(exc).__name__}: {exc}",
+            ) from exc
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"AI 请求异常（{type(exc).__name__}）：{exc}",
             ) from exc
 
     try:

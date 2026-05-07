@@ -37,6 +37,7 @@ services:
     image: nginx:alpine
     container_name: wc_nginx
     restart: unless-stopped
+    profiles: ["https"]
     ports:
       - "80:80"
       - "443:443"

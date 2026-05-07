@@ -155,11 +155,29 @@ def check_docker() -> None:
 
 
 def _is_dockerhub_reachable() -> bool:
-    """测试 Docker Hub 连通性（3 秒超时）。"""
+    """用真实 HTTPS 请求检测 Docker Hub 连通性（5 秒超时）。"""
+    import urllib.request
+    import urllib.error
     try:
-        s = socket.create_connection(("registry-1.docker.io", 443), timeout=3)
-        s.close()
+        req = urllib.request.Request(
+            "https://registry-1.docker.io/v2/",
+            headers={"User-Agent": "docker/20.10"},
+        )
+        with urllib.request.urlopen(req, timeout=5):
+            pass
         return True
+    except Exception:
+        return False
+
+
+def _has_mirror_configured() -> bool:
+    """检查是否已配置了镜像加速。"""
+    daemon_json = Path("/etc/docker/daemon.json")
+    if not daemon_json.exists():
+        return False
+    try:
+        content = daemon_json.read_text()
+        return "registry-mirrors" in content
     except Exception:
         return False
 
@@ -171,6 +189,10 @@ def _ensure_docker_mirror() -> None:
     """
     if _is_dockerhub_reachable():
         ok("Docker Hub 连通 ✓")
+        return
+
+    if _has_mirror_configured():
+        warn("Docker Hub 仍不可达，但镜像加速已配置。将继续尝试，如失败请检查镜像源是否有效。")
         return
 
     warn("Docker Hub 连接超时（国内网络限制）。")

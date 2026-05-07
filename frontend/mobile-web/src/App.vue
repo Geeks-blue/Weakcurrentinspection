@@ -849,7 +849,7 @@ onUnmounted(() => {
           <label>密码</label>
           <input v-model="password" type="password" placeholder="请输入登录密码" />
           <button class="login-btn" :disabled="loading" @click="doLogin">{{ loading ? "登录中..." : "立即登录" }}</button>
-          <p class="hint" v-if="loginMessage">{{ loginMessage }}</p>
+          <p class="error" v-if="loginMessage">{{ loginMessage }}</p>
         </div>
       </div>
     </template>

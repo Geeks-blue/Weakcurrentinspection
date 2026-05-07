@@ -1370,7 +1370,7 @@ onMounted(async () => {
           <button class="login-btn" :disabled="authLoading" @click="handleLogin">
             {{ authLoading ? "登录中..." : "立即登录" }}
           </button>
-          <p class="hint" v-if="authMessage">{{ authMessage }}</p>
+          <p class="error" v-if="authMessage">{{ authMessage }}</p>
         </div>
       </div>
     </template>

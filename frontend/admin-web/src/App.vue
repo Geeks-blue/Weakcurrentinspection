@@ -61,8 +61,8 @@ type WorkspaceSub = "inspection" | "assets" | "records" | "accounts";
 type ViewHash = ConsolePage | "login";
 type RoomInspectionGroup = { building_code: string; room_code: string; items: ConsoleInspectionItem[] };
 
-const username = ref("teacher01");
-const password = ref("Teacher@123");
+const username = ref("");
+const password = ref("");
 const authLoading = ref(false);
 const authMessage = ref("");
 const currentUser = ref<UserProfile | null>(null);

@@ -1,4 +1,236 @@
-# 校园弱电巡检与资产管理系统（单人开发版）
+# 校园弱电巡检与资产管理系统
+
+基于 Vue 3 + FastAPI + PostgreSQL 的校园弱电机房巡检管理平台，支持移动端学生巡检、管理端教师派单/审核、AI 辅助分析和资产台账管理。
+
+---
+
+## 系统架构
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│  管理端  frontend/admin-web  (教师/管理员)  HTTPS 443          │
+│  移动端  frontend/mobile-web (学生)         HTTPS 5174          │
+│  后端    backend/             FastAPI        HTTPS 18000         │
+│  存储    MinIO                对象存储        9000               │
+│  数据库  PostgreSQL                          5432               │
+└────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 功能概述
+
+### 管理端（教师/管理员）
+- **账户管理**：创建学生/教师/管理员账号，设置角色和性别
+- **资产管理**：房间台账、资产台账，支持 CSV/XLSX 批量导入，二维码打印
+- **任务派遣**：向指定学生派发弱电巡检任务，支持一次性/每周/每月周期
+- **巡检审核**：通过/驳回/需整改，支持按房间卡片查看历史记录
+- **AI 分析**：对单条记录或某房间全部历史记录调用 AI 给出风险评估
+- **记录管理**：多维度筛选，逐条查看详情和照片
+
+### 移动端（学生）
+- **任务列表**：查看并选择当前待巡检任务，支持搜索
+- **扫码签到**：拍摄房间门口二维码自动识别（支持 Safari/Chrome，微信 JSSDK 待配置）
+- **参考图对比**：扫码后展示该房间历史参考照片，便于对准角度
+- **资产核对**：扫码后自动加载该房间资产台账
+- **照片采集**：1-5 张带水印（时间/地点/人员）照片，支持历史参考图叠加
+- **巡检表单**：签到方式、锁闭状态、杂物情况、指示灯、资产核对、备注
+- **记录查询**：查看自己的历史巡检记录及审核状态
+
+---
+
+## 快速启动
+
+### 1. 准备环境
+
+```bash
+# 克隆项目
+git clone <仓库地址>
+cd weakcurrentinspection
+
+# 配置环境变量
+cp .env.example .env
+# 编辑 .env 修改数据库密码、JWT 密钥等
+```
+
+### 2. 启动基础服务（Docker）
+
+```bash
+docker compose up -d
+# 启动 PostgreSQL、Redis、MinIO
+```
+
+### 3. 启动后端
+
+```bash
+cd backend
+python -m venv .venv
+
+# Windows PowerShell
+.\.venv\Scripts\Activate.ps1
+# macOS/Linux
+source .venv/bin/activate
+
+pip install -r requirements.txt
+
+# 首次运行自动建表并创建种子账号
+uvicorn app.main:app --reload --host 0.0.0.0 --port 18000
+```
+
+### 4. 启动管理端前端
+
+```bash
+cd frontend/admin-web
+npm install
+npm run dev
+# 开发环境访问 http://localhost:5173
+```
+
+### 5. 启动移动端前端
+
+```bash
+cd frontend/mobile-web
+npm install
+npm run dev
+# 开发环境访问 http://localhost:5174
+```
+
+---
+
+## 生产部署（HTTPS）
+
+Safari/iOS 定位功能需要 HTTPS，参见 [docs/https-setup.md](docs/https-setup.md)：
+
+```bash
+# 1. 生成本地可信证书（局域网 IP）
+cd nginx/ssl
+mkcert -key-file server.key -cert-file server.crt 192.168.x.x localhost
+
+# 2. 构建前端
+cd frontend/admin-web && npm run build
+cd frontend/mobile-web && npm run build
+
+# 3. 启动 Nginx（提供 HTTPS 静态文件服务）
+docker compose up -d nginx
+
+# 4. 带 SSL 启动后端
+uvicorn app.main:app --host 0.0.0.0 --port 18000 \
+  --ssl-keyfile nginx/ssl/server.key \
+  --ssl-certfile nginx/ssl/server.crt
+```
+
+iPhone 导入根证书：`设置 → 通用 → VPN与设备管理 → 安装 → 证书信任设置 → 开启`
+
+---
+
+## 数据库迁移
+
+新增字段时需手动执行 SQL（使用 psql 或 pgAdmin）：
+
+```sql
+-- v1 → v2：房间性别限制字段
+ALTER TABLE rooms ADD COLUMN IF NOT EXISTS gender_restriction VARCHAR(16) NOT NULL DEFAULT 'none';
+```
+
+---
+
+## 初始账号
+
+系统首次启动后自动创建以下种子账号（密码请务必在生产环境中修改）：
+
+| 账号 | 密码 | 角色 |
+|------|------|------|
+| admin | Admin@123456 | 管理员 |
+| teacher01 | Teacher@123 | 教师 |
+| student_f01 | Student@123 | 学生（女） |
+| student_m01 | Student@123 | 学生（男） |
+
+> **生产环境**：登录管理端 → 业务面板 → 账户管理 → 修改或删除默认账号。
+
+---
+
+## 配置说明（.env）
+
+| 变量 | 说明 |
+|------|------|
+| `DATABASE_URL` | PostgreSQL 连接字符串 |
+| `JWT_SECRET_KEY` | JWT 签名密钥，**生产必须修改** |
+| `CORS_ALLOW_ORIGINS` | 允许跨域的前端地址，HTTPS 部署需更新 |
+| `MINIO_ROOT_USER` | MinIO 管理员账号 |
+| `MINIO_ROOT_PASSWORD` | MinIO 管理员密码，**生产必须修改** |
+| `WECHAT_APPID` | 微信公众号 AppID（扫一扫功能，选填） |
+| `WECHAT_APPSECRET` | 微信公众号 AppSecret（选填） |
+| `AI_PROVIDER_API_KEY` | AI 服务 API Key（选填） |
+| `AI_DEFAULT_ENDPOINT` | AI 接口地址，默认 OpenAI |
+| `AI_DEFAULT_MODEL` | 默认模型，默认 gpt-4o-mini |
+
+---
+
+## 权限说明
+
+### 房间性别限制
+每个房间可独立设置性别限制：
+- **无限制**：男女学生均可巡检
+- **仅限女生**：只允许女生学生巡检（派单和提交均会校验）
+- **仅限男生**：只允许男生学生巡检
+
+### 角色权限
+| 角色 | 权限 |
+|------|------|
+| student | 查看自己的任务、提交巡检 |
+| teacher | 派单、审核、查看所有记录、资产管理 |
+| admin | 所有权限 + 账户管理 |
+
+---
+
+## 示例数据
+
+参见 [docs/sample_rooms.csv](docs/sample_rooms.csv) 和 [docs/sample_assets.csv](docs/sample_assets.csv)，可在管理端资产管理页面直接导入。
+
+---
+
+## 微信扫一扫（待配置）
+
+JSSDK 代码已集成，配置步骤：
+1. 在微信公众号后台配置 JS 接口安全域名（填写移动端部署域名）
+2. 在 `.env` 填写 `WECHAT_APPID` 和 `WECHAT_APPSECRET`
+3. 重启后端
+4. 在 `frontend/mobile-web/src/App.vue` 启用微信扫码分支（模板中已有注释标注）
+
+---
+
+## AI 分析功能
+
+1. 管理端 → 系统设置 → AI 接口输入网关
+2. 配置 endpoint / API Key / 模型（支持任何 OpenAI 兼容接口）
+3. 在巡检记录总览中点击房间卡片 → 「🤖 AI 整体分析」
+4. 单条记录点击「详情/AI分析」→ 「🤖 AI 分析建议」
+
+---
+
+## 目录结构
+
+```
+.
+├── backend/                  # FastAPI 后端
+│   ├── app/
+│   │   ├── api/              # 路由处理（auth/assets/tasks/inspections/ai/wechat）
+│   │   ├── core/             # 配置、策略、安全工具
+│   │   ├── models/           # SQLAlchemy ORM 模型
+│   │   ├── schemas/          # Pydantic 请求/响应 schema
+│   │   └── main.py           # 应用入口、路由注册
+│   └── requirements.txt
+├── frontend/
+│   ├── admin-web/            # 管理端（Vue 3 + TypeScript）
+│   └── mobile-web/           # 移动端（Vue 3 + TypeScript）
+├── nginx/                    # Nginx 配置和 SSL 证书目录
+├── docs/                     # 文档和示例数据
+│   ├── https-setup.md        # HTTPS 部署完整指南
+│   ├── sample_rooms.csv      # 房间示例数据
+│   └── sample_assets.csv     # 资产示例数据
+├── docker-compose.yml        # 基础服务编排
+└── .env.example              # 环境变量模板
+```
 
 本工作区用于从零实现以下目标：
 - 学生端移动网页巡检（无需安装 App）

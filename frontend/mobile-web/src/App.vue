@@ -20,8 +20,8 @@ import {
   type TaskItem
 } from "./api";
 
-const username = ref("student_f01");
-const password = ref("Student@123");
+const username = ref("");
+const password = ref("");
 const loginMessage = ref("");
 const loading = ref(false);
 const currentRole = ref("");

@@ -1380,7 +1380,7 @@ onMounted(async () => {
         <div class="workspace-content">
           <header class="hero">
             <h1>弱电巡检管理台</h1>
-            <p>统一登录后按角色自动分流，支持管理员注册、教师派单和巡检审核。</p>
+            <p>弱电巡检管理台</p>
           </header>
 
       <template v-if="activePage === 'settings'">
@@ -1446,7 +1446,6 @@ onMounted(async () => {
       <template v-else>
         <section class="panel" v-if="isAdmin && workspaceSub === 'accounts'">
           <h2>账户管理</h2>
-          <p class="hint">该面板仅管理员可见，用于新增学生、教师、运维和管理员账号。</p>
           <div class="grid">
             <div class="row">
               <label for="registerUsername">账号</label>
@@ -1529,7 +1528,6 @@ onMounted(async () => {
 
         <section class="panel" v-if="isReviewer && workspaceSub === 'inspection'">
           <h2>教师任务派遣</h2>
-          <p class="hint">教师和管理员都可派单，系统会按宿舍楼策略校验是否允许派发。</p>
           <div class="actions">
             <button class="ghost" :disabled="dispatchOptionsLoading" @click="loadDispatchOptions">
               {{ dispatchOptionsLoading ? "加载中..." : "刷新派单选项" }}
@@ -1710,8 +1708,7 @@ onMounted(async () => {
         </section>
 
         <section class="panel" v-if="isReviewer && workspaceSub === 'assets'">
-          <h2>资产管理（房间与资产表格导入）</h2>
-          <p class="hint">支持 CSV / XLSX。房间导入字段：building_code, room_code, floor_label, location_text, is_active。资产导入字段：asset_code, asset_name, room_code, quantity, asset_category, status, manufacturer, model, note。</p>
+          <h2>资产管理</h2>
           <input ref="roomsImportInput" class="file-input-hidden" type="file" accept=".csv,.xlsx" @change="onRoomsImportChange" />
           <input ref="assetsImportInput" class="file-input-hidden" type="file" accept=".csv,.xlsx" @change="onAssetsImportChange" />
 

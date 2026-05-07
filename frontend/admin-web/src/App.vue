@@ -1364,7 +1364,7 @@ onMounted(async () => {
             <p class="hint">教师 / 管理员统一入口，学生请使用移动端。</p>
           </div>
           <label for="username">账号</label>
-          <input id="username" v-model="username" placeholder="teacher01 / admin" />
+          <input id="username" v-model="username" placeholder="请输入账号" />
           <label for="password">密码</label>
           <input id="password" v-model="password" type="password" placeholder="请输入登录密码" />
           <button class="login-btn" :disabled="authLoading" @click="handleLogin">

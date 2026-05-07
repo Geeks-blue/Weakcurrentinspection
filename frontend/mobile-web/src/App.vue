@@ -845,7 +845,7 @@ onUnmounted(() => {
             <p class="hint">学生账号登录后可执行任务签到与巡检填报。</p>
           </div>
           <label>账号</label>
-          <input v-model="username" placeholder="student_f01" />
+          <input v-model="username" placeholder="请输入账号" />
           <label>密码</label>
           <input v-model="password" type="password" placeholder="请输入登录密码" />
           <button class="login-btn" :disabled="loading" @click="doLogin">{{ loading ? "登录中..." : "立即登录" }}</button>

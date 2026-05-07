@@ -21,9 +21,13 @@ router = APIRouter()
 @router.post("/login", response_model=LoginResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse:
     """用户登录：验证账号密码，返回 JWT 访问令牌和用户信息。"""
-    user = db.query(User).filter(User.username == payload.username, User.is_active.is_(True)).first()
-    if not user or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    user = db.query(User).filter(User.username == payload.username).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="账号不存在")
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="账号已被停用，请联系管理员")
+    if not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="密码错误")
 
     token = create_access_token(subject=user.username)
     return LoginResponse(

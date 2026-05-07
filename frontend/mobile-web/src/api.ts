@@ -101,7 +101,9 @@ export async function login(username: string, password: string): Promise<LoginRe
   });
 
   if (!response.ok) {
-    throw new Error(`登录失败: ${response.status}`);
+    const data = await response.json().catch(() => null);
+    const detail = data?.detail;
+    throw new Error(typeof detail === "string" ? detail : `登录失败: ${response.status}`);
   }
   return (await response.json()) as LoginResponse;
 }

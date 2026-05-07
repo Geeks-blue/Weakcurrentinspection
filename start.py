@@ -127,7 +127,7 @@ def check_python_version() -> None:
 
 
 def check_docker() -> None:
-    """检查 Docker 及 Docker Compose 是否安装并运行。"""
+    """检查 Docker 及 Docker Compose 是否安装并运行；在国内环境自动配置镜像加速。"""
     if not shutil.which("docker"):
         err("未找到 docker 命令。")
         err("请安装 Docker Desktop：https://docs.docker.com/get-docker/")
@@ -149,6 +149,91 @@ def check_docker() -> None:
         err("请升级 Docker Desktop 至最新版本。")
         sys.exit(1)
     ok("Docker Compose V2 ✓")
+
+    # 检测 Docker Hub 连通性，国内环境自动配置镜像加速
+    _ensure_docker_mirror()
+
+
+def _is_dockerhub_reachable() -> bool:
+    """测试 Docker Hub 连通性（3 秒超时）。"""
+    try:
+        s = socket.create_connection(("registry-1.docker.io", 443), timeout=3)
+        s.close()
+        return True
+    except Exception:
+        return False
+
+
+def _ensure_docker_mirror() -> None:
+    """
+    若 Docker Hub 不可达（常见于国内服务器），自动写入镜像加速配置并重启 Docker。
+    仅在 Linux 且具有 sudo 权限时生效；Windows/macOS 用户需手动配置。
+    """
+    if _is_dockerhub_reachable():
+        ok("Docker Hub 连通 ✓")
+        return
+
+    warn("Docker Hub 连接超时（国内网络限制）。")
+
+    if platform.system() != "Linux":
+        warn("请手动为 Docker 配置镜像加速后重试。")
+        warn("  Windows: Docker Desktop → Settings → Docker Engine → 添加 registry-mirrors")
+        warn("  macOS:   Docker Desktop → Preferences → Docker Engine → 添加 registry-mirrors")
+        err("无法继续，Docker Hub 不可达。")
+        sys.exit(1)
+
+    log("正在为 Docker 配置国内镜像加速（需要 sudo 权限）...")
+
+    daemon_json = Path("/etc/docker/daemon.json")
+    mirrors_config = '''{
+  "registry-mirrors": [
+    "https://docker.mirrors.ustc.edu.cn",
+    "https://hub-mirror.c.163.com",
+    "https://registry.cn-hangzhou.aliyuncs.com"
+  ]
+}
+'''
+    # 备份原有配置
+    if daemon_json.exists():
+        backup = daemon_json.with_suffix(".json.bak")
+        result = subprocess.run(["sudo", "cp", str(daemon_json), str(backup)],
+                                capture_output=True)
+        if result.returncode == 0:
+            log(f"原有配置已备份至 {backup}")
+
+    # 写入新配置
+    write_result = subprocess.run(
+        ["sudo", "tee", str(daemon_json)],
+        input=mirrors_config.encode(),
+        capture_output=True,
+    )
+    if write_result.returncode != 0:
+        err("写入 /etc/docker/daemon.json 失败，请手动配置镜像加速：")
+        err("  sudo tee /etc/docker/daemon.json << 'EOF'")
+        err(mirrors_config)
+        err("  EOF")
+        err("  sudo systemctl restart docker")
+        sys.exit(1)
+
+    ok("镜像加速配置已写入 /etc/docker/daemon.json")
+
+    # 重载并重启 Docker
+    log("重启 Docker 服务...")
+    subprocess.run(["sudo", "systemctl", "daemon-reload"], check=False)
+    result = subprocess.run(["sudo", "systemctl", "restart", "docker"],
+                            capture_output=True)
+    if result.returncode != 0:
+        err("Docker 重启失败，请手动执行：sudo systemctl restart docker")
+        sys.exit(1)
+
+    time.sleep(2)
+
+    # 再次检测
+    if _is_dockerhub_reachable():
+        ok("Docker Hub 连通（镜像加速生效）✓")
+    else:
+        warn("配置镜像加速后仍无法连通，可能需要等待几秒后重试。")
+        warn("继续尝试拉取镜像，若失败请手动拉取或更换镜像源。")
 
 
 def check_node() -> bool:

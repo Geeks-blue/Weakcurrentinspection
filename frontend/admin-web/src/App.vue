@@ -1359,7 +1359,7 @@ onMounted(async () => {
       <div class="login-center">
         <div class="login-card">
           <div class="login-card-brand">
-            <p class="login-brand-tag">Campus Infra Console</p>
+            <p class="login-brand-tag">弱电巡检管理台</p>
             <h1>弱电巡检管理台</h1>
             <p class="hint">教师 / 管理员统一入口，学生请使用移动端。</p>
           </div>

@@ -840,7 +840,7 @@ onUnmounted(() => {
       <div class="login-center">
         <div class="login-card">
           <div class="login-card-brand">
-            <p class="login-brand-tag">Student Inspector</p>
+            <p class="login-brand-tag">学生巡检端</p>
             <h1>弱电巡检移动工作台</h1>
             <p class="hint">学生账号登录后可执行任务签到与巡检填报。</p>
           </div>

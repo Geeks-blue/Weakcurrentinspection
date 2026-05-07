@@ -172,6 +172,9 @@ export async function login(username: string, password: string): Promise<LoginRe
   if (!response.ok) {
     const data = await response.json().catch(() => null);
     const detail = data?.detail;
+    if (response.status === 422) {
+      throw new Error("账号或密码不能为空");
+    }
     throw new Error(typeof detail === "string" ? detail : `登录失败：${response.status}`);
   }
 

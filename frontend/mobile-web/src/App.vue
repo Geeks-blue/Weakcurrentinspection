@@ -856,13 +856,13 @@ onUnmounted(() => {
 
     <template v-else>
       <header class="m-work-header">
-        <div>
-          <h1>弱电巡检移动端</h1>
-          <p class="hint">登录成功后可执行任务巡检与记录查询。</p>
-        </div>
-        <div class="row">
-          <button class="ghost" @click="() => { clearPhotos(); refreshTasks(); }">刷新任务</button>
-          <button class="ghost" @click="doLogout">退出</button>
+        <h1>弱电巡检移动端</h1>
+        <div class="header-right">
+          <span class="user-badge">👤 {{ currentUsername }}</span>
+          <div class="row">
+            <button class="ghost" @click="() => { clearPhotos(); refreshTasks(); }">刷新任务</button>
+            <button class="ghost" @click="doLogout">退出</button>
+          </div>
         </div>
       </header>
 

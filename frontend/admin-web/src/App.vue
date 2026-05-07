@@ -1558,7 +1558,7 @@ onMounted(async () => {
               <label for="dispatchStudent">派发学生</label>
               <select id="dispatchStudent" v-model.number="dispatchStudentId">
                 <option v-for="student in dispatchStudents" :key="student.student_user_id" :value="student.student_user_id">
-                  {{ student.username }}（{{ student.gender || "未设置" }}）
+                  {{ student.username }}（{{ student.gender === 'female' ? '女' : student.gender === 'male' ? '男' : '未设置' }}）
                 </option>
               </select>
             </div>
@@ -1679,7 +1679,7 @@ onMounted(async () => {
                   <label for="editTaskStudent">学生</label>
                   <select id="editTaskStudent" v-model.number="editTaskStudentId">
                     <option v-for="student in dispatchStudents" :key="student.student_user_id" :value="student.student_user_id">
-                      {{ student.username }}（{{ student.gender || "未设置" }}）
+                      {{ student.username }}（{{ student.gender === 'female' ? '女' : student.gender === 'male' ? '男' : '未设置' }}）
                     </option>
                   </select>
                 </div>

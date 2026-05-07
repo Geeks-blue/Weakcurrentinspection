@@ -58,6 +58,7 @@ class Room(Base):
     location_text: Mapped[str | None] = mapped_column(String(255), nullable=True)
     qr_token: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    gender_restriction: Mapped[str] = mapped_column(String(16), nullable=False, default="none", server_default="none")
     created_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

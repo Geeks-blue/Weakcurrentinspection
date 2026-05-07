@@ -12,6 +12,7 @@ class AssetRoomItem(BaseModel):
     floor_label: str | None
     location_text: str | None
     is_active: bool
+    gender_restriction: str
 
 
 class AssetRoomCreate(BaseModel):
@@ -20,6 +21,7 @@ class AssetRoomCreate(BaseModel):
     floor_label: str | None = None
     location_text: str | None = None
     is_active: bool = True
+    gender_restriction: str = "none"
 
 
 class AssetItemView(BaseModel):

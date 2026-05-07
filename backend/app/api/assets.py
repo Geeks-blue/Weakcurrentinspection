@@ -71,6 +71,7 @@ def create_room(item: AssetRoomCreate, db: Session = Depends(get_db), _: User = 
         location_text=item.location_text,
         qr_token=f"QR-{item.room_code}",
         is_active=item.is_active,
+        gender_restriction=item.gender_restriction,
     )
     db.add(room)
     db.commit()
@@ -83,6 +84,7 @@ def create_room(item: AssetRoomCreate, db: Session = Depends(get_db), _: User = 
         floor_label=room.floor_label,
         location_text=room.location_text,
         is_active=room.is_active,
+        gender_restriction=room.gender_restriction,
     )
 
 @router.put("/room/{room_id}", response_model=AssetRoomItem)
@@ -106,6 +108,7 @@ def update_room(room_id: int, item: AssetRoomCreate, db: Session = Depends(get_d
     room.floor_label = item.floor_label
     room.location_text = item.location_text
     room.is_active = item.is_active
+    room.gender_restriction = item.gender_restriction
     db.commit()
     db.refresh(room)
     return AssetRoomItem(
@@ -116,6 +119,7 @@ def update_room(room_id: int, item: AssetRoomCreate, db: Session = Depends(get_d
         floor_label=room.floor_label,
         location_text=room.location_text,
         is_active=room.is_active,
+        gender_restriction=room.gender_restriction,
     )
 
 @router.delete("/room/{room_id}")
@@ -346,6 +350,7 @@ def list_rooms(
             floor_label=room.floor_label,
             location_text=room.location_text,
             is_active=room.is_active,
+            gender_restriction=room.gender_restriction,
         )
         for room, building in rows
     ]

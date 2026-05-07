@@ -121,7 +121,7 @@ def create_assignment(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
 
     room, building = row
-    assert_teacher_can_assign(student.gender or "", building.code)
+    assert_teacher_can_assign(student.gender or "", building.code, room.gender_restriction)
 
     now = datetime.now(UTC)
     task = InspectionTask(
@@ -186,7 +186,7 @@ def my_tasks(
     result: list[TaskAssignmentItem] = []
     for assignment, task, room, building in rows:
         try:
-            assert_student_can_access_room(current_user.gender or "", building.code)
+            assert_student_can_access_room(current_user.gender or "", building.code, room.gender_restriction)
         except HTTPException:
             continue
 

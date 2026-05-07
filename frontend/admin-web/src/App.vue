@@ -248,7 +248,7 @@ function openRoomDialog(room?: AssetRoomItem) {
     editingRoom.value = { ...room };
     editingRoomId.value = room.room_id;
   } else {
-    editingRoom.value = { building_code: "", room_code: "", floor_label: "", location_text: "", is_active: true };
+    editingRoom.value = { building_code: "", room_code: "", floor_label: "", location_text: "", is_active: true, gender_restriction: "none" };
     editingRoomId.value = null;
   }
   showRoomDialog.value = true;
@@ -1745,6 +1745,7 @@ onMounted(async () => {
                       <th>楼层</th>
                       <th>位置</th>
                       <th>状态</th>
+                      <th>性别限制</th>
                       <th>资产数</th>
                     </tr>
                   </thead>
@@ -1761,6 +1762,7 @@ onMounted(async () => {
                       <td>{{ room.floor_label || "-" }}</td>
                       <td>{{ room.location_text || "-" }}</td>
                       <td>{{ room.is_active ? "启用" : "禁用" }}</td>
+                      <td>{{ room.gender_restriction === 'female' ? '仅限女生' : room.gender_restriction === 'male' ? '仅限男生' : '无限制' }}</td>
                       <td>
                         <span
                           class="asset-count-badge"
@@ -2142,6 +2144,14 @@ onMounted(async () => {
                 <option :value="false">禁用</option>
               </select>
             </div>
+            <div class="row">
+              <label>性别限制</label>
+              <select v-model="editingRoom.gender_restriction">
+                <option value="none">无限制（男女均可）</option>
+                <option value="female">仅限女生</option>
+                <option value="male">仅限男生</option>
+              </select>
+            </div>
           </div>
           <div class="dialog-qr-col">
             <img :src="getRoomQrcodeUrl(actionRoom.room_id)" alt="二维码" class="dialog-qr-img" />
@@ -2242,6 +2252,14 @@ onMounted(async () => {
             <select v-model="editingRoom.is_active">
               <option :value="true">启用</option>
               <option :value="false">禁用</option>
+            </select>
+          </div>
+          <div class="row">
+            <label>性别限制</label>
+            <select v-model="editingRoom.gender_restriction">
+              <option value="none">无限制（男女均可）</option>
+              <option value="female">仅限女生</option>
+              <option value="male">仅限男生</option>
             </select>
           </div>
         </div>

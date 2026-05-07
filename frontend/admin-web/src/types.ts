@@ -6,6 +6,7 @@ export interface AssetRoomEdit {
   floor_label?: string | null;
   location_text?: string | null;
   is_active: boolean;
+  gender_restriction: string;
 }
 
 // 资产编辑/新增类型
@@ -189,6 +190,7 @@ export interface AssetRoomItem {
   floor_label: string | null;
   location_text: string | null;
   is_active: boolean;
+  gender_restriction: string;
 }
 
 export interface AssetItemView {

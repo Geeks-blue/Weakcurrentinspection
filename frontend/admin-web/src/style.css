@@ -414,6 +414,7 @@ button.danger {
   width: 16px;
   color: var(--primary);
   font-size: 0.78rem;
+  transition: transform 0.18s ease;
 }
 
 .building-count {
@@ -421,6 +422,15 @@ button.danger {
   font-size: 0.8rem;
   color: var(--muted);
   font-weight: normal;
+}
+
+@keyframes buildingRowIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.building-room-row {
+  animation: buildingRowIn 0.16s ease;
 }
   display: flex;
   flex-direction: column;

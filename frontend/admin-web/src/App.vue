@@ -140,7 +140,7 @@ function toggleBuilding(code: string): void {
 }
 
 function isBuildingExpanded(code: string): boolean {
-  return expandedBuildings.value[code] !== false; // 默认展开
+  return expandedBuildings.value[code] === true; // 默认收起
 }
 const assets = ref<AssetItemView[]>([]);
 const assetLoading = ref(false);
@@ -1777,7 +1777,7 @@ onMounted(async () => {
                         <tr
                           v-for="room in grp.rooms"
                           :key="room.room_id"
-                          class="room-row"
+                          class="room-row building-room-row"
                           :class="{ 'room-row-selected': selectedRoomId === room.room_id }"
                           @click="openRoomActionDialog(room)"
                         >

@@ -631,7 +631,7 @@ button.danger {
 .dialog-mask {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: 1000;
   background: rgb(4 10 24 / 48%);
   display: grid;
   place-items: center;

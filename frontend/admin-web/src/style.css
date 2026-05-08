@@ -400,6 +400,16 @@ button.danger {
   user-select: none;
 }
 
+.asset-group-header {
+  background: #f4f7ff;
+  cursor: pointer;
+  user-select: none;
+}
+
+.asset-group-header:hover {
+  background: #e8eeff;
+}
+
 .building-header-row:hover {
   background: #dbe8ff;
 }

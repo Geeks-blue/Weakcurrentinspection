@@ -164,6 +164,28 @@ const filteredAssets = computed(() =>
   selectedRoomCode.value ? assets.value.filter((a) => a.room_code === selectedRoomCode.value) : assets.value
 );
 
+const expandedAssetGroups = ref<Record<string, boolean>>({});
+
+const assetNameGroups = computed(() => {
+  const map = new Map<string, { name: string; totalQty: number; items: typeof assets.value }>();
+  for (const asset of filteredAssets.value) {
+    const key = asset.asset_name;
+    if (!map.has(key)) map.set(key, { name: key, totalQty: 0, items: [] });
+    const g = map.get(key)!;
+    g.totalQty += asset.quantity;
+    g.items.push(asset);
+  }
+  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+});
+
+function toggleAssetGroup(name: string): void {
+  expandedAssetGroups.value = { ...expandedAssetGroups.value, [name]: !expandedAssetGroups.value[name] };
+}
+
+function isAssetGroupExpanded(name: string): boolean {
+  return expandedAssetGroups.value[name] === true;
+}
+
 const pendingTasks = ref<PendingTaskManageItem[]>([]);
 const pendingTasksLoading = ref(false);
 const pendingTasksError = ref("");
@@ -1814,13 +1836,47 @@ onMounted(async () => {
                 </div>
               </div>
               <div class="table-wrap">
-                <table class="data-table">
+                <!-- 未筛选房间：按资产名称分组汇总，可点击展开 -->
+                <table class="data-table" v-if="!selectedRoomCode">
+                  <thead>
+                    <tr>
+                      <th>资产名称</th>
+                      <th>总数量</th>
+                      <th>种类数</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template v-for="grp in assetNameGroups" :key="grp.name">
+                      <tr class="asset-group-header" @click="toggleAssetGroup(grp.name)">
+                        <td>
+                          <span class="building-toggle">{{ isAssetGroupExpanded(grp.name) ? '▼' : '▶' }}</span>
+                          <strong>{{ grp.name }}</strong>
+                        </td>
+                        <td><strong>{{ grp.totalQty }}</strong> 台</td>
+                        <td>{{ grp.items.length }} 条</td>
+                      </tr>
+                      <template v-if="isAssetGroupExpanded(grp.name)">
+                        <tr
+                          v-for="asset in grp.items"
+                          :key="asset.asset_id"
+                          class="room-row building-room-row"
+                          :class="{ 'room-row-selected': selectedAssetId === asset.asset_id }"
+                          @click="openAssetActionDialog(asset)"
+                        >
+                          <td style="padding-left:28px">{{ asset.building_code }} / {{ asset.room_code }}</td>
+                          <td>{{ asset.quantity }}</td>
+                          <td>{{ asset.model || asset.manufacturer || formatAssetStatus(asset.status) }}</td>
+                        </tr>
+                      </template>
+                    </template>
+                  </tbody>
+                </table>
+                <!-- 已筛选房间：显示该房间全部资产详情 -->
+                <table class="data-table" v-else>
                   <thead>
                     <tr>
                       <th>资产编码</th>
                       <th>名称</th>
-                      <th>类别</th>
-                      <th>位置</th>
                       <th>型号</th>
                       <th>厂家</th>
                       <th>数量</th>
@@ -1838,8 +1894,6 @@ onMounted(async () => {
                     >
                       <td>{{ asset.asset_code }}</td>
                       <td>{{ asset.asset_name }}</td>
-                      <td>{{ asset.asset_category || "-" }}</td>
-                      <td>{{ asset.building_code }} / {{ asset.room_code }}</td>
                       <td>{{ asset.model || "-" }}</td>
                       <td>{{ asset.manufacturer || "-" }}</td>
                       <td>{{ asset.quantity }}</td>

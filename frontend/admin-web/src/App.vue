@@ -136,6 +136,32 @@ function toggleDispatchRoom(id: number): void {
   else dispatchRoomIds.value = dispatchRoomIds.value.filter(x => x !== id);
 }
 const dispatchStudentId = ref<number | null>(null);
+const dispatchStudentIds = ref<number[]>([]);
+const dispatchStudentFilter = ref("");
+
+const filteredDispatchStudents = computed(() => {
+  const q = dispatchStudentFilter.value.trim().toLowerCase();
+  if (!q) return dispatchStudents.value;
+  return dispatchStudents.value.filter(s => s.username.toLowerCase().includes(q));
+});
+
+function toggleDispatchStudent(id: number): void {
+  const idx = dispatchStudentIds.value.indexOf(id);
+  if (idx === -1) dispatchStudentIds.value = [...dispatchStudentIds.value, id];
+  else dispatchStudentIds.value = dispatchStudentIds.value.filter(x => x !== id);
+}
+
+// 平均分配预览：返回每位学生分配的房间数
+const dispatchPreview = computed(() => {
+  const rooms = dispatchRoomIds.value;
+  const students = dispatchStudentIds.value;
+  if (!rooms.length || !students.length) return [];
+  return students.map((sid, si) => {
+    const assignedRooms = rooms.filter((_, ri) => ri % students.length === si);
+    const student = dispatchStudents.value.find(s => s.student_user_id === sid);
+    return { username: student?.username ?? String(sid), count: assignedRooms.length };
+  });
+});
 const dispatchDueAt = ref(buildDefaultDueAt());
 
 const assetRooms = ref<AssetRoomItem[]>([]);
@@ -1197,7 +1223,7 @@ async function submitDispatch(): Promise<void> {
     dispatchError.value = "任务标题不能为空。";
     return;
   }
-  if (!dispatchRoomIds.value.length || !dispatchStudentId.value) {
+  if (!dispatchRoomIds.value.length || !dispatchStudentIds.value.length) {
     dispatchError.value = "请至少选择一个派发房间和一名学生。";
     return;
   }
@@ -1212,21 +1238,29 @@ async function submitDispatch(): Promise<void> {
     return;
   }
 
+  // 按轮询方式平均分配：room[0]→student[0], room[1]→student[1], ...
+  const studentIds = dispatchStudentIds.value;
+  const assignments = dispatchRoomIds.value.map((roomId, idx) => ({
+    room_id: roomId,
+    student_user_id: studentIds[idx % studentIds.length],
+  }));
+
   dispatchLoading.value = true;
   try {
     const results = await Promise.all(
-      dispatchRoomIds.value.map(roomId =>
+      assignments.map(a =>
         createTaskAssignment({
           task_title: dispatchTaskTitle.value.trim(),
           cycle_type: dispatchCycleType.value,
-          room_id: roomId,
-          student_user_id: dispatchStudentId.value!,
+          room_id: a.room_id,
+          student_user_id: a.student_user_id,
           due_at: dueDate.toISOString()
         })
       )
     );
-    dispatchMessage.value = `成功派单 ${results.length} 个房间，派单ID：${results.map(r => r.assignment_id).join("、")}`;
+    dispatchMessage.value = `成功派单 ${results.length} 个任务，共分配给 ${studentIds.length} 名学生`;
     dispatchRoomIds.value = [];
+    dispatchStudentIds.value = [];
     await Promise.all([loadPendingReviews(), loadPendingTasks()]);
   } catch (error) {
     dispatchError.value = error instanceof Error ? error.message : "派单失败。";
@@ -1630,12 +1664,32 @@ onMounted(async () => {
               </div>
             </div>
             <div class="row">
-              <label for="dispatchStudent">派发学生</label>
-              <select id="dispatchStudent" v-model.number="dispatchStudentId">
-                <option v-for="student in dispatchStudents" :key="student.student_user_id" :value="student.student_user_id">
+              <label>派发学生（已选 {{ dispatchStudentIds.length }} 名）</label>
+              <input v-model="dispatchStudentFilter" placeholder="搜索学生..." class="dispatch-room-search" />
+              <div class="dispatch-room-list">
+                <label
+                  v-for="student in filteredDispatchStudents"
+                  :key="student.student_user_id"
+                  class="dispatch-room-option"
+                  :class="{ selected: dispatchStudentIds.includes(student.student_user_id) }"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="dispatchStudentIds.includes(student.student_user_id)"
+                    @change="toggleDispatchStudent(student.student_user_id)"
+                  />
                   {{ student.username }}（{{ student.gender === 'female' ? '女' : student.gender === 'male' ? '男' : '未设置' }}）
-                </option>
-              </select>
+                </label>
+                <p class="hint" v-if="filteredDispatchStudents.length === 0">无符合条件的学生</p>
+              </div>
+              <!-- 分配预览 -->
+              <div class="dispatch-preview" v-if="dispatchPreview.length > 0">
+                <p class="dispatch-preview-title">📋 任务分配预览（轮询均分）</p>
+                <div v-for="p in dispatchPreview" :key="p.username" class="dispatch-preview-row">
+                  <span>{{ p.username }}</span>
+                  <span class="dispatch-preview-count">{{ p.count }} 间</span>
+                </div>
+              </div>
             </div>
             <div class="row">
               <label for="dispatchDue">截止时间</label>

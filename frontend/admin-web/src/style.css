@@ -852,3 +852,32 @@ button.danger {
 .dispatch-room-option:hover { background: #f4f8ff; }
 .dispatch-room-option.selected { background: #edf3ff; color: #1a4ea6; font-weight: 600; }
 .dispatch-room-option input[type="checkbox"] { width: auto; border: none; border-radius: 0; padding: 0; flex-shrink: 0; }
+
+.dispatch-preview {
+  margin-top: 8px;
+  border: 1px solid #b8cfff;
+  border-radius: 8px;
+  background: #f0f5ff;
+  padding: 8px 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.dispatch-preview-title {
+  margin: 0 0 4px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #24436f;
+}
+
+.dispatch-preview-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: #24436f;
+}
+
+.dispatch-preview-count {
+  font-weight: 700;
+  color: var(--primary);
+}

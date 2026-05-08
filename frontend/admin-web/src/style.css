@@ -823,3 +823,32 @@ button.danger {
   font-size: 0.8rem;
   color: var(--muted);
 }
+
+.dispatch-room-search {
+  margin-bottom: 6px;
+}
+
+.dispatch-room-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #c6d4ea;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.dispatch-room-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  cursor: pointer;
+  font-weight: normal;
+  color: var(--text);
+  border-bottom: 1px solid #edf2f9;
+  transition: background 0.1s;
+}
+
+.dispatch-room-option:last-child { border-bottom: none; }
+.dispatch-room-option:hover { background: #f4f8ff; }
+.dispatch-room-option.selected { background: #edf3ff; color: #1a4ea6; font-weight: 600; }
+.dispatch-room-option input[type="checkbox"] { width: auto; border: none; border-radius: 0; padding: 0; flex-shrink: 0; }

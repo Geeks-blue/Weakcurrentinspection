@@ -119,6 +119,22 @@ const dispatchMessage = ref("");
 const dispatchTaskTitle = ref("例行弱电巡检");
 const dispatchCycleType = ref<"one_off" | "weekly" | "monthly">("one_off");
 const dispatchRoomId = ref<number | null>(null);
+const dispatchRoomIds = ref<number[]>([]);
+const dispatchRoomFilter = ref("");
+
+const filteredDispatchRooms = computed(() => {
+  const q = dispatchRoomFilter.value.trim().toLowerCase();
+  if (!q) return dispatchRooms.value;
+  return dispatchRooms.value.filter(
+    r => r.room_code.toLowerCase().includes(q) || r.building_code.toLowerCase().includes(q) || r.building_name.toLowerCase().includes(q)
+  );
+});
+
+function toggleDispatchRoom(id: number): void {
+  const idx = dispatchRoomIds.value.indexOf(id);
+  if (idx === -1) dispatchRoomIds.value = [...dispatchRoomIds.value, id];
+  else dispatchRoomIds.value = dispatchRoomIds.value.filter(x => x !== id);
+}
 const dispatchStudentId = ref<number | null>(null);
 const dispatchDueAt = ref(buildDefaultDueAt());
 
@@ -1181,8 +1197,8 @@ async function submitDispatch(): Promise<void> {
     dispatchError.value = "任务标题不能为空。";
     return;
   }
-  if (!dispatchRoomId.value || !dispatchStudentId.value) {
-    dispatchError.value = "请先选择派发房间和学生。";
+  if (!dispatchRoomIds.value.length || !dispatchStudentId.value) {
+    dispatchError.value = "请至少选择一个派发房间和一名学生。";
     return;
   }
   if (!dispatchDueAt.value.trim()) {
@@ -1198,14 +1214,19 @@ async function submitDispatch(): Promise<void> {
 
   dispatchLoading.value = true;
   try {
-    const result = await createTaskAssignment({
-      task_title: dispatchTaskTitle.value.trim(),
-      cycle_type: dispatchCycleType.value,
-      room_id: dispatchRoomId.value,
-      student_user_id: dispatchStudentId.value,
-      due_at: dueDate.toISOString()
-    });
-    dispatchMessage.value = `${result.message}，派单ID ${result.assignment_id}`;
+    const results = await Promise.all(
+      dispatchRoomIds.value.map(roomId =>
+        createTaskAssignment({
+          task_title: dispatchTaskTitle.value.trim(),
+          cycle_type: dispatchCycleType.value,
+          room_id: roomId,
+          student_user_id: dispatchStudentId.value!,
+          due_at: dueDate.toISOString()
+        })
+      )
+    );
+    dispatchMessage.value = `成功派单 ${results.length} 个房间，派单ID：${results.map(r => r.assignment_id).join("、")}`;
+    dispatchRoomIds.value = [];
     await Promise.all([loadPendingReviews(), loadPendingTasks()]);
   } catch (error) {
     dispatchError.value = error instanceof Error ? error.message : "派单失败。";
@@ -1588,12 +1609,25 @@ onMounted(async () => {
               </select>
             </div>
             <div class="row">
-              <label for="dispatchRoom">派发房间</label>
-              <select id="dispatchRoom" v-model.number="dispatchRoomId">
-                <option v-for="room in dispatchRooms" :key="room.room_id" :value="room.room_id">
-                  {{ room.building_code }} / {{ room.room_code }}（{{ room.building_name }}）
-                </option>
-              </select>
+              <label>派发房间（已选 {{ dispatchRoomIds.length }} 间）</label>
+              <input v-model="dispatchRoomFilter" placeholder="搜索楼栋/房间..." class="dispatch-room-search" />
+              <div class="dispatch-room-list">
+                <label
+                  v-for="room in filteredDispatchRooms"
+                  :key="room.room_id"
+                  class="dispatch-room-option"
+                  :class="{ selected: dispatchRoomIds.includes(room.room_id) }"
+                >
+                  <input
+                    type="checkbox"
+                    :value="room.room_id"
+                    :checked="dispatchRoomIds.includes(room.room_id)"
+                    @change="toggleDispatchRoom(room.room_id)"
+                  />
+                  {{ room.building_code }} / {{ room.room_code }}
+                </label>
+                <p class="hint" v-if="filteredDispatchRooms.length === 0">无符合条件的房间</p>
+              </div>
             </div>
             <div class="row">
               <label for="dispatchStudent">派发学生</label>

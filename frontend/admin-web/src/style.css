@@ -394,7 +394,34 @@ button.danger {
   margin: 0 0 10px;
 }
 
-.asset-stack-layout {
+.building-header-row {
+  background: #edf3ff;
+  cursor: pointer;
+  user-select: none;
+}
+
+.building-header-row:hover {
+  background: #dbe8ff;
+}
+
+.building-header-row td {
+  padding: 8px 10px;
+  font-size: 0.92rem;
+}
+
+.building-toggle {
+  display: inline-block;
+  width: 16px;
+  color: var(--primary);
+  font-size: 0.78rem;
+}
+
+.building-count {
+  margin-left: 8px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-weight: normal;
+}
   display: flex;
   flex-direction: column;
   gap: 16px;

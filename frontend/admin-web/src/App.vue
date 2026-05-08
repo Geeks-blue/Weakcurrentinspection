@@ -123,6 +123,25 @@ const dispatchStudentId = ref<number | null>(null);
 const dispatchDueAt = ref(buildDefaultDueAt());
 
 const assetRooms = ref<AssetRoomItem[]>([]);
+const expandedBuildings = ref<Record<string, boolean>>({});
+
+const buildingGroups = computed(() => {
+  const map = new Map<string, { name: string; rooms: AssetRoomItem[] }>();
+  for (const room of assetRooms.value) {
+    const key = room.building_code;
+    if (!map.has(key)) map.set(key, { name: room.building_name || room.building_code, rooms: [] });
+    map.get(key)!.rooms.push(room);
+  }
+  return Array.from(map.entries()).map(([code, v]) => ({ code, ...v }));
+});
+
+function toggleBuilding(code: string): void {
+  expandedBuildings.value = { ...expandedBuildings.value, [code]: !expandedBuildings.value[code] };
+}
+
+function isBuildingExpanded(code: string): boolean {
+  return expandedBuildings.value[code] !== false; // 默认展开
+}
 const assets = ref<AssetItemView[]>([]);
 const assetLoading = ref(false);
 const assetError = ref("");
@@ -1737,7 +1756,6 @@ onMounted(async () => {
                 <table class="data-table">
                   <thead>
                     <tr>
-                      <th>楼栋</th>
                       <th>房间</th>
                       <th>楼层</th>
                       <th>位置</th>
@@ -1747,26 +1765,35 @@ onMounted(async () => {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr
-                      v-for="room in assetRooms.slice(0, 120)"
-                      :key="room.room_id"
-                      class="room-row"
-                      :class="{ 'room-row-selected': selectedRoomId === room.room_id }"
-                      @click="openRoomActionDialog(room)"
-                    >
-                      <td>{{ room.building_code }}</td>
-                      <td>{{ room.room_code }}</td>
-                      <td>{{ room.floor_label || "-" }}</td>
-                      <td>{{ room.location_text || "-" }}</td>
-                      <td>{{ room.is_active ? "启用" : "禁用" }}</td>
-                      <td>{{ room.gender_restriction === 'female' ? '仅限女生' : room.gender_restriction === 'male' ? '仅限男生' : '无限制' }}</td>
-                      <td>
-                        <span
-                          class="asset-count-badge"
-                          :class="{ 'asset-count-active': selectedRoomCode === room.room_code }"
-                        >{{ roomAssetCount[room.room_code] || 0 }} 件</span>
-                      </td>
-                    </tr>
+                    <template v-for="grp in buildingGroups" :key="grp.code">
+                      <tr class="building-header-row" @click="toggleBuilding(grp.code)">
+                        <td colspan="6">
+                          <span class="building-toggle">{{ isBuildingExpanded(grp.code) ? '▼' : '▶' }}</span>
+                          <strong>{{ grp.name }}</strong>
+                          <span class="building-count">{{ grp.rooms.length }} 间</span>
+                        </td>
+                      </tr>
+                      <template v-if="isBuildingExpanded(grp.code)">
+                        <tr
+                          v-for="room in grp.rooms"
+                          :key="room.room_id"
+                          class="room-row"
+                          :class="{ 'room-row-selected': selectedRoomId === room.room_id }"
+                          @click="openRoomActionDialog(room)"
+                        >
+                          <td>{{ room.room_code }}</td>
+                          <td>{{ room.floor_label || "-" }}</td>
+                          <td>{{ room.location_text || "-" }}</td>
+                          <td>{{ room.is_active ? "启用" : "禁用" }}</td>
+                          <td>{{ room.gender_restriction === 'female' ? '仅限女生' : room.gender_restriction === 'male' ? '仅限男生' : '无限制' }}</td>
+                          <td>
+                            <span class="asset-count-badge" :class="{ 'asset-count-active': selectedRoomCode === room.room_code }">
+                              {{ roomAssetCount[room.room_code] || 0 }} 件
+                            </span>
+                          </td>
+                        </tr>
+                      </template>
+                    </template>
                   </tbody>
                 </table>
               </div>
@@ -1792,9 +1819,13 @@ onMounted(async () => {
                     <tr>
                       <th>资产编码</th>
                       <th>名称</th>
+                      <th>类别</th>
                       <th>位置</th>
+                      <th>型号</th>
+                      <th>厂家</th>
                       <th>数量</th>
                       <th>状态</th>
+                      <th>备注</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1807,9 +1838,13 @@ onMounted(async () => {
                     >
                       <td>{{ asset.asset_code }}</td>
                       <td>{{ asset.asset_name }}</td>
+                      <td>{{ asset.asset_category || "-" }}</td>
                       <td>{{ asset.building_code }} / {{ asset.room_code }}</td>
+                      <td>{{ asset.model || "-" }}</td>
+                      <td>{{ asset.manufacturer || "-" }}</td>
                       <td>{{ asset.quantity }}</td>
                       <td>{{ formatAssetStatus(asset.status) }}</td>
+                      <td>{{ asset.note || "-" }}</td>
                     </tr>
                   </tbody>
                 </table>

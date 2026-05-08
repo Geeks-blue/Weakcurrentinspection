@@ -74,6 +74,7 @@ def dispatch_options(
             room_code=room.room_code,
             building_code=building.code,
             building_name=building.name,
+            gender_restriction=room.gender_restriction,
         )
         for room, building in room_rows
     ]

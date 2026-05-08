@@ -161,6 +161,7 @@ export interface DispatchRoomOption {
   room_code: string;
   building_code: string;
   building_name: string;
+  gender_restriction: string;
 }
 
 export interface DispatchStudentOption {

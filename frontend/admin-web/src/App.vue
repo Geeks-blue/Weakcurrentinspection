@@ -151,16 +151,43 @@ function toggleDispatchStudent(id: number): void {
   else dispatchStudentIds.value = dispatchStudentIds.value.filter(x => x !== id);
 }
 
-// 平均分配预览：返回每位学生分配的房间数
+// 性别感知均分预览：按房间性别限制分配给合适学生
 const dispatchPreview = computed(() => {
   const rooms = dispatchRoomIds.value;
   const students = dispatchStudentIds.value;
   if (!rooms.length || !students.length) return [];
-  return students.map((sid, si) => {
-    const assignedRooms = rooms.filter((_, ri) => ri % students.length === si);
-    const student = dispatchStudents.value.find(s => s.student_user_id === sid);
-    return { username: student?.username ?? String(sid), count: assignedRooms.length };
+
+  const studentMap = new Map(dispatchStudents.value.map(s => [s.student_user_id, s]));
+  const roomMap = new Map(dispatchRooms.value.map(r => [r.room_id, r]));
+  const counts = new Map<number, number>(students.map(id => [id, 0]));
+
+  function pickLeast(pool: number[]): number | null {
+    if (!pool.length) return null;
+    return pool.reduce((a, b) => (counts.get(a) ?? 0) <= (counts.get(b) ?? 0) ? a : b);
+  }
+
+  const warnings: string[] = [];
+  for (const roomId of rooms) {
+    const room = roomMap.get(roomId);
+    const restriction = room?.gender_restriction ?? 'none';
+    let pool: number[];
+    if (restriction === 'female') pool = students.filter(id => studentMap.get(id)?.gender === 'female');
+    else if (restriction === 'male') pool = students.filter(id => studentMap.get(id)?.gender === 'male');
+    else pool = [...students];
+
+    const sid = pickLeast(pool);
+    if (sid === null) {
+      warnings.push(`${room?.room_code ?? roomId}（无匹配性别学生）`);
+    } else {
+      counts.set(sid, (counts.get(sid) ?? 0) + 1);
+    }
+  }
+
+  const rows = students.map(id => {
+    const s = studentMap.get(id);
+    return { username: s?.username ?? String(id), count: counts.get(id) ?? 0, gender: s?.gender };
   });
+  return { rows, warnings };
 });
 const dispatchDueAt = ref(buildDefaultDueAt());
 
@@ -1238,12 +1265,40 @@ async function submitDispatch(): Promise<void> {
     return;
   }
 
-  // 按轮询方式平均分配：room[0]→student[0], room[1]→student[1], ...
-  const studentIds = dispatchStudentIds.value;
-  const assignments = dispatchRoomIds.value.map((roomId, idx) => ({
-    room_id: roomId,
-    student_user_id: studentIds[idx % studentIds.length],
-  }));
+  // 性别感知最少负载分配算法
+  const studentMap = new Map(dispatchStudents.value.map(s => [s.student_user_id, s]));
+  const roomMap = new Map(dispatchRooms.value.map(r => [r.room_id, r]));
+  const counts = new Map<number, number>(dispatchStudentIds.value.map(id => [id, 0]));
+
+  function pickLeast(pool: number[]): number | null {
+    if (!pool.length) return null;
+    return pool.reduce((a, b) => (counts.get(a) ?? 0) <= (counts.get(b) ?? 0) ? a : b);
+  }
+
+  const assignments: Array<{room_id: number; student_user_id: number}> = [];
+  const skipped: string[] = [];
+
+  for (const roomId of dispatchRoomIds.value) {
+    const room = roomMap.get(roomId);
+    const restriction = room?.gender_restriction ?? 'none';
+    let pool: number[];
+    if (restriction === 'female') pool = dispatchStudentIds.value.filter(id => studentMap.get(id)?.gender === 'female');
+    else if (restriction === 'male') pool = dispatchStudentIds.value.filter(id => studentMap.get(id)?.gender === 'male');
+    else pool = [...dispatchStudentIds.value];
+
+    const sid = pickLeast(pool);
+    if (sid === null) {
+      skipped.push(room?.room_code ?? String(roomId));
+    } else {
+      counts.set(sid, (counts.get(sid) ?? 0) + 1);
+      assignments.push({ room_id: roomId, student_user_id: sid });
+    }
+  }
+
+  if (!assignments.length) {
+    dispatchError.value = "没有可分配的任务，请检查房间性别限制与选中学生是否匹配。";
+    return;
+  }
 
   dispatchLoading.value = true;
   try {
@@ -1258,7 +1313,7 @@ async function submitDispatch(): Promise<void> {
         })
       )
     );
-    dispatchMessage.value = `成功派单 ${results.length} 个任务，共分配给 ${studentIds.length} 名学生`;
+    dispatchMessage.value = `成功派单 ${results.length} 个任务，共分配给 ${dispatchStudentIds.value.length} 名学生${skipped.length ? `；以下房间因性别限制跳过：${skipped.join("、")}` : ""}`;
     dispatchRoomIds.value = [];
     dispatchStudentIds.value = [];
     await Promise.all([loadPendingReviews(), loadPendingTasks()]);
@@ -1683,12 +1738,15 @@ onMounted(async () => {
                 <p class="hint" v-if="filteredDispatchStudents.length === 0">无符合条件的学生</p>
               </div>
               <!-- 分配预览 -->
-              <div class="dispatch-preview" v-if="dispatchPreview.length > 0">
-                <p class="dispatch-preview-title">📋 任务分配预览（轮询均分）</p>
-                <div v-for="p in dispatchPreview" :key="p.username" class="dispatch-preview-row">
-                  <span>{{ p.username }}</span>
+              <div class="dispatch-preview" v-if="dispatchPreview && (dispatchPreview.rows?.length || 0) > 0">
+                <p class="dispatch-preview-title">📋 任务分配预览（性别限制感知均分）</p>
+                <div v-for="p in dispatchPreview.rows" :key="p.username" class="dispatch-preview-row">
+                  <span>{{ p.username }}（{{ p.gender === 'female' ? '女' : p.gender === 'male' ? '男' : '—' }}）</span>
                   <span class="dispatch-preview-count">{{ p.count }} 间</span>
                 </div>
+                <p class="error" v-if="dispatchPreview.warnings?.length">
+                  ⚠ 以下房间无匹配性别学生：{{ dispatchPreview.warnings.join("、") }}
+                </p>
               </div>
             </div>
             <div class="row">

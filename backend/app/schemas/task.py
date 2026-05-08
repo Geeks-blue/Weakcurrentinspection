@@ -34,6 +34,7 @@ class DispatchRoomOption(BaseModel):
     room_code: str
     building_code: str
     building_name: str
+    gender_restriction: str
 
 
 class DispatchStudentOption(BaseModel):

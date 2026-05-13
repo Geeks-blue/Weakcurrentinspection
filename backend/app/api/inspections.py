@@ -129,6 +129,23 @@ def get_inspection_photo(object_key: str) -> FileResponse:
     return FileResponse(file_path)
 
 
+@router.get("/photos/{object_key}/data-url")
+def get_inspection_photo_data_url(
+    object_key: str,
+    current_user: User = Depends(require_teacher_or_admin),
+) -> dict:
+    import base64 as _base64
+
+    file_path = UPLOAD_DIR / object_key
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Photo not found")
+    ext = file_path.suffix.lower().lstrip(".")
+    mime = f"image/{'jpeg' if ext in ('jpg', 'jpeg') else ext}"
+    with open(file_path, "rb") as f:
+        data = f.read()
+    return {"data_url": f"data:{mime};base64,{_base64.b64encode(data).decode()}"}
+
+
 @router.get("/room-reference-photo")
 def room_reference_photo(
     room_code: str = Query(...),

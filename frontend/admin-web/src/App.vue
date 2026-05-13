@@ -12,6 +12,7 @@ import {
   createTaskAssignment,
   deleteTaskAssignment,
   deleteInspectionRecord,
+  getPhotoDataUrl,
   deleteUser,
   listUsers,
   updateUser,
@@ -125,14 +126,9 @@ const visionLoading = ref(false);
 const visionError = ref("");
 
 async function fetchImageAsBase64(url: string): Promise<string> {
-  const response = await fetch(url);
-  const blob = await response.blob();
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
+  const key = url.split("/").pop() ?? "";
+  if (!key) throw new Error("无法解析照片路径");
+  return getPhotoDataUrl(key);
 }
 
 function cropImageToDataUrl(

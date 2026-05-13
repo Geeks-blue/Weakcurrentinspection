@@ -282,6 +282,19 @@ export async function getConsoleInspections(filters: ConsoleInspectionFilters = 
   return (await response.json()) as ConsoleInspectionItem[];
 }
 
+export async function getPhotoDataUrl(objectKey: string): Promise<string> {
+  const token = getAccessToken();
+  const response = await fetch(`${getBackendBaseUrl()}/inspections/photos/${encodeURIComponent(objectKey)}/data-url`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) {
+    throw new Error(`获取图片失败：${response.status}`);
+  }
+  const data = await response.json();
+  return data.data_url as string;
+}
+
 export async function deleteInspectionRecord(inspectionId: number): Promise<DeleteInspectionResponse> {
   const token = getAccessToken();
   const response = await fetch(`${getBackendBaseUrl()}/inspections/${inspectionId}`, {

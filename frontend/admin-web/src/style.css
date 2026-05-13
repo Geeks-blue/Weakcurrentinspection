@@ -616,6 +616,60 @@ button.danger {
   color: #f5f8ff;
 }
 
+.compare-strip {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  margin-top: 12px;
+}
+
+.compare-col {
+  flex: 1;
+  background: #f6f9ff;
+  border: 1px solid #d7e3f7;
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.compare-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #2c4a8a;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.compare-info {
+  font-size: 12px;
+  color: #5a6a8a;
+  margin-bottom: 10px;
+}
+
+.compare-photos {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.compare-photos img {
+  width: 130px;
+  height: 98px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #c7d8f0;
+  cursor: zoom-in;
+  background: #eef3fb;
+}
+
+.compare-arrow {
+  font-size: 28px;
+  color: #8aa8d8;
+  align-self: center;
+  flex-shrink: 0;
+}
+
 .result {
   margin-top: 12px;
   background: #f8fbff;

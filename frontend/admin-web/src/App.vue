@@ -110,6 +110,24 @@ const reviewReason = ref("");
 const reviewLoading = ref(false);
 const reviewMessage = ref("");
 
+const showRoomCompareDialog = ref(false);
+const compareRoomCode = ref("");
+const compareInspections = ref<ConsoleInspectionItem[]>([]);
+const compareLoading = ref(false);
+
+async function openRoomCompare(room: AssetRoomItem): Promise<void> {
+  compareRoomCode.value = room.room_code;
+  compareInspections.value = [];
+  showRoomCompareDialog.value = true;
+  compareLoading.value = true;
+  try {
+    const items = await getConsoleInspections({ room_code: room.room_code, limit: 50 });
+    compareInspections.value = items;
+  } finally {
+    compareLoading.value = false;
+  }
+}
+
 const dispatchRooms = ref<DispatchRoomOption[]>([]);
 const dispatchStudents = ref<DispatchStudentOption[]>([]);
 const dispatchOptionsLoading = ref(false);
@@ -151,7 +169,7 @@ function toggleDispatchStudent(id: number): void {
   else dispatchStudentIds.value = dispatchStudentIds.value.filter(x => x !== id);
 }
 
-// 性别感知均分预览：按房间性别限制分配给合适学生
+// 性别感知 + 楼栋亲和性均分预览
 const dispatchPreview = computed(() => {
   const rooms = dispatchRoomIds.value;
   const students = dispatchStudentIds.value;
@@ -160,6 +178,7 @@ const dispatchPreview = computed(() => {
   const studentMap = new Map(dispatchStudents.value.map(s => [s.student_user_id, s]));
   const roomMap = new Map(dispatchRooms.value.map(r => [r.room_id, r]));
   const counts = new Map<number, number>(students.map(id => [id, 0]));
+  const buildingStudent = new Map<string, number>();
 
   function pickLeast(pool: number[]): number | null {
     if (!pool.length) return null;
@@ -170,16 +189,19 @@ const dispatchPreview = computed(() => {
   for (const roomId of rooms) {
     const room = roomMap.get(roomId);
     const restriction = room?.gender_restriction ?? 'none';
+    const buildingKey = room?.building_code ?? '';
     let pool: number[];
     if (restriction === 'female') pool = students.filter(id => studentMap.get(id)?.gender === 'female');
     else if (restriction === 'male') pool = students.filter(id => studentMap.get(id)?.gender === 'male');
     else pool = [...students];
 
-    const sid = pickLeast(pool);
+    const preferred = buildingStudent.get(buildingKey);
+    const sid = (preferred !== undefined && pool.includes(preferred)) ? preferred : pickLeast(pool);
     if (sid === null) {
       warnings.push(`${room?.room_code ?? roomId}（无匹配性别学生）`);
     } else {
       counts.set(sid, (counts.get(sid) ?? 0) + 1);
+      if (!buildingStudent.has(buildingKey)) buildingStudent.set(buildingKey, sid);
     }
   }
 
@@ -1265,10 +1287,11 @@ async function submitDispatch(): Promise<void> {
     return;
   }
 
-  // 性别感知最少负载分配算法
+  // 性别感知 + 楼栋亲和性最少负载分配算法
   const studentMap = new Map(dispatchStudents.value.map(s => [s.student_user_id, s]));
   const roomMap = new Map(dispatchRooms.value.map(r => [r.room_id, r]));
   const counts = new Map<number, number>(dispatchStudentIds.value.map(id => [id, 0]));
+  const buildingStudent = new Map<string, number>();
 
   function pickLeast(pool: number[]): number | null {
     if (!pool.length) return null;
@@ -1281,17 +1304,20 @@ async function submitDispatch(): Promise<void> {
   for (const roomId of dispatchRoomIds.value) {
     const room = roomMap.get(roomId);
     const restriction = room?.gender_restriction ?? 'none';
+    const buildingKey = room?.building_code ?? '';
     let pool: number[];
     if (restriction === 'female') pool = dispatchStudentIds.value.filter(id => studentMap.get(id)?.gender === 'female');
     else if (restriction === 'male') pool = dispatchStudentIds.value.filter(id => studentMap.get(id)?.gender === 'male');
     else pool = [...dispatchStudentIds.value];
 
-    const sid = pickLeast(pool);
+    const preferred = buildingStudent.get(buildingKey);
+    const sid = (preferred !== undefined && pool.includes(preferred)) ? preferred : pickLeast(pool);
     if (sid === null) {
       skipped.push(room?.room_code ?? String(roomId));
     } else {
       counts.set(sid, (counts.get(sid) ?? 0) + 1);
       assignments.push({ room_id: roomId, student_user_id: sid });
+      if (!buildingStudent.has(buildingKey)) buildingStudent.set(buildingKey, sid);
     }
   }
 
@@ -1947,7 +1973,9 @@ onMounted(async () => {
                           :key="room.room_id"
                           class="room-row building-room-row"
                           :class="{ 'room-row-selected': selectedRoomId === room.room_id }"
+                          :title="`${room.room_code}｜${room.floor_label || ''}｜${room.location_text || ''}｜资产 ${roomAssetCount[room.room_code] || 0} 件`"
                           @click="openRoomActionDialog(room)"
+                          @dblclick.stop="openRoomCompare(room)"
                         >
                           <td>{{ room.room_code }}</td>
                           <td>{{ room.floor_label || "-" }}</td>
@@ -2262,6 +2290,54 @@ onMounted(async () => {
     <div class="photo-lightbox" v-if="previewPhotoUrl" @click.self="closePhotoPreview">
       <button class="photo-lightbox-close" @click="closePhotoPreview">关闭</button>
       <img :src="previewPhotoUrl" alt="巡检照片预览" />
+    </div>
+
+    <!-- 房间巡检历史照片对比弹窗 -->
+    <div v-if="showRoomCompareDialog" class="dialog-mask" @click.self="showRoomCompareDialog = false">
+      <div class="dialog-panel dialog-panel-wide">
+        <h3>📸 巡检历史对比 · {{ compareRoomCode }}</h3>
+        <div v-if="compareLoading" class="hint" style="text-align:center;padding:24px">加载中...</div>
+        <div v-else-if="!compareInspections.length" class="hint" style="text-align:center;padding:24px">该房间暂无巡检记录。</div>
+        <div v-else>
+          <div class="compare-strip">
+            <div class="compare-col" v-if="compareInspections.length >= 2">
+              <div class="compare-label">
+                最早 · {{ new Date(compareInspections[compareInspections.length - 1].submitted_at).toLocaleDateString() }}
+                <span class="record-status" :class="statusClass(compareInspections[compareInspections.length - 1].status)">{{ formatStatus(compareInspections[compareInspections.length - 1].status) }}</span>
+              </div>
+              <div class="compare-info">
+                <span>学生：{{ compareInspections[compareInspections.length - 1].student_username }}</span>
+              </div>
+              <div class="compare-photos">
+                <template v-if="compareInspections[compareInspections.length - 1].photo_urls.length">
+                  <img v-for="url in compareInspections[compareInspections.length - 1].photo_urls.slice(0, 3)" :key="url" :src="url" @click="openPhotoPreview(url)" />
+                </template>
+                <span v-else class="hint">无照片</span>
+              </div>
+            </div>
+            <div class="compare-arrow" v-if="compareInspections.length >= 2">→</div>
+            <div class="compare-col">
+              <div class="compare-label">
+                最新 · {{ new Date(compareInspections[0].submitted_at).toLocaleDateString() }}
+                <span class="record-status" :class="statusClass(compareInspections[0].status)">{{ formatStatus(compareInspections[0].status) }}</span>
+              </div>
+              <div class="compare-info">
+                <span>学生：{{ compareInspections[0].student_username }}</span>
+              </div>
+              <div class="compare-photos">
+                <template v-if="compareInspections[0].photo_urls.length">
+                  <img v-for="url in compareInspections[0].photo_urls.slice(0, 3)" :key="url" :src="url" @click="openPhotoPreview(url)" />
+                </template>
+                <span v-else class="hint">无照片</span>
+              </div>
+            </div>
+          </div>
+          <p class="hint" style="text-align:center;margin-top:8px">共 {{ compareInspections.length }} 条记录，显示最早与最新各一条。点击图片可放大。</p>
+        </div>
+        <div class="actions">
+          <button class="ghost" @click="showRoomCompareDialog = false">关闭</button>
+        </div>
+      </div>
     </div>
 
     <!-- 批量打印标签弹窗 -->

@@ -1,4 +1,9 @@
 ﻿// 文件说明：该文件为弱电巡检系统源码，已按中文注释规范维护。
+export interface ChatMessage {
+  role: "system" | "user" | "assistant";
+  content: string | any[];
+}
+
 export interface AiRequestInput {
   mode: "backend_proxy" | "direct";
   backendBaseUrl: string;
@@ -10,6 +15,7 @@ export interface AiRequestInput {
   userPrompt: string;
   temperature: number;
   images?: string[];
+  messages?: ChatMessage[];
 }
 
 export interface AiResponseOutput {
@@ -28,6 +34,19 @@ export function stripMarkdown(text: string): string {
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+export function extractJsonArray<T = unknown>(text: string): T[] | null {
+  const stripped = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+  const codeMatch = stripped.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/);
+  if (codeMatch) {
+    try { return JSON.parse(codeMatch[1]) as T[]; } catch { /* fall through */ }
+  }
+  const arrayMatch = stripped.match(/\[[\s\S]*\]/);
+  if (arrayMatch) {
+    try { return JSON.parse(arrayMatch[0]) as T[]; } catch { /* fall through */ }
+  }
+  return null;
 }
 
 function extractText(payload: any): string {
@@ -67,20 +86,26 @@ async function callDirect(input: AiRequestInput): Promise<AiResponseOutput> {
     throw new Error("请填写 AI 接口地址。");
   }
 
-  const userContent = input.images?.length
-    ? [
-        { type: "text", text: input.userPrompt },
-        ...input.images.map(img => ({ type: "image_url", image_url: { url: img } }))
-      ]
-    : input.userPrompt;
+  let messages: any[];
+  if (input.messages) {
+    messages = input.messages;
+  } else {
+    const userContent = input.images?.length
+      ? [
+          { type: "text", text: input.userPrompt },
+          ...input.images.map(img => ({ type: "image_url", image_url: { url: img } }))
+        ]
+      : input.userPrompt;
+    messages = [
+      ...(input.systemPrompt ? [{ role: "system", content: input.systemPrompt }] : []),
+      { role: "user", content: userContent }
+    ];
+  }
 
   const body = {
     model: input.model,
     temperature: input.temperature,
-    messages: [
-      ...(input.systemPrompt ? [{ role: "system", content: input.systemPrompt }] : []),
-      { role: "user", content: userContent }
-    ]
+    messages
   };
 
   const response = await fetch(endpoint, {
@@ -98,15 +123,25 @@ async function callDirect(input: AiRequestInput): Promise<AiResponseOutput> {
     throw new Error(`AI 接口调用失败：${response.status} ${JSON.stringify(data)}`);
   }
 
-  return {
-    raw: data,
-    text: extractText(data)
-  };
+  return { raw: data, text: extractText(data) };
 }
 
 async function callByBackendProxy(input: AiRequestInput): Promise<AiResponseOutput> {
   if (!input.accessToken) {
     throw new Error("后端代理模式需要先登录。");
+  }
+
+  const body: Record<string, unknown> = {
+    endpoint: input.endpoint,
+    api_key: input.apiKey,
+    model: input.model,
+    system_prompt: input.systemPrompt,
+    user_prompt: input.userPrompt,
+    temperature: input.temperature,
+    images: input.images ?? []
+  };
+  if (input.messages) {
+    body.messages = input.messages;
   }
 
   const response = await fetch(`${input.backendBaseUrl}/ai/proxy/chat`, {
@@ -115,15 +150,7 @@ async function callByBackendProxy(input: AiRequestInput): Promise<AiResponseOutp
       "Content-Type": "application/json",
       Authorization: `Bearer ${input.accessToken}`
     },
-    body: JSON.stringify({
-      endpoint: input.endpoint,
-      api_key: input.apiKey,
-      model: input.model,
-      system_prompt: input.systemPrompt,
-      user_prompt: input.userPrompt,
-      temperature: input.temperature,
-      images: input.images ?? []
-    })
+    body: JSON.stringify(body)
   });
 
   const data = await parseResponse(response);
@@ -132,10 +159,7 @@ async function callByBackendProxy(input: AiRequestInput): Promise<AiResponseOutp
     throw new Error(`AI 代理调用失败：${response.status} ${JSON.stringify(data)}`);
   }
 
-  return {
-    raw: data,
-    text: extractText(data)
-  };
+  return { raw: data, text: extractText(data) };
 }
 
 export async function callAiGateway(input: AiRequestInput): Promise<AiResponseOutput> {
@@ -150,4 +174,3 @@ export async function callAiGateway(input: AiRequestInput): Promise<AiResponseOu
     throw e;
   }
 }
-

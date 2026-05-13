@@ -2,7 +2,7 @@
 // 文件说明：该页面是管理端核心交互页面，按中文注释规范维护。
 import { computed, onMounted, ref } from "vue";
 
-import { callAiGateway, stripMarkdown } from "./api/ai";
+import { callAiGateway, extractJsonArray, stripMarkdown, type ChatMessage } from "./api/ai";
 import {
   getAssetRooms,
   getAssets,
@@ -99,6 +99,11 @@ const roomAiResult = ref("");
 const roomAiError = ref("");
 const roomAiSummary = ref("");
 const roomAiSummaryLoading = ref(false);
+
+const chatMessages = ref<ChatMessage[]>([]);
+const chatInput = ref("");
+const chatLoading = ref(false);
+const chatSystemCtx = ref("");
 
 const showInspectionDetailDialog = ref(false);
 const detailItem = ref<ConsoleInspectionItem | null>(null);
@@ -201,16 +206,8 @@ async function requestVisionAssets(): Promise<void> {
       images: imageDataUrls,
     });
 
-    let parsed: VisionAsset[] = [];
-    const match = output.text.match(/\[[\s\S]*\]/);
-    if (match) {
-      try {
-        parsed = JSON.parse(match[0]);
-      } catch {
-        visionError.value = "AI 返回格式无法解析，请重试。";
-        return;
-      }
-    } else {
+    let parsed: VisionAsset[] | null = extractJsonArray<VisionAsset>(output.text);
+    if (!parsed) {
       visionError.value = "AI 未返回结构化结果：" + output.text.slice(0, 120);
       return;
     }
@@ -384,6 +381,7 @@ const importingRooms = ref(false);
 const importingAssets = ref(false);
 const roomsImportInput = ref<HTMLInputElement | null>(null);
 const assetsImportInput = ref<HTMLInputElement | null>(null);
+const chatScrollRef = ref<HTMLElement | null>(null);
 const selectedRoomCode = ref("");
 
 const roomAssetCount = computed(() => {
@@ -1204,6 +1202,16 @@ function openRoomRecords(group: RoomInspectionGroup): void {
   roomAiResult.value = "";
   roomAiError.value = "";
   roomAiSummary.value = "";
+  chatMessages.value = [];
+  chatInput.value = "";
+  const lockMap: Record<string, string> = { locked: "已锁", unlocked: "未锁", lock_damaged: "门锁损坏" };
+  const clutterMap: Record<string, string> = { none: "无杂物", stacked_items: "有堆放物品", water: "有积水", odor: "有异味" };
+  const indicatorMap: Record<string, string> = { all_ok: "全部正常", partial_abnormal: "个别异常", all_abnormal: "全部异常" };
+  const assetMap: Record<string, string> = { matched: "与台账一致", missing: "资产缺失", extra: "资产多余", moved: "位置变动" };
+  const lines = group.items.map((item, i) =>
+    `${i + 1}.(${new Date(item.submitted_at).toLocaleDateString()})${formatStatus(item.status)},锁=${lockMap[item.lock_state] || item.lock_state},杂物=${clutterMap[item.clutter_state] || item.clutter_state},指示灯=${indicatorMap[item.indicator_state] || item.indicator_state},资产=${assetMap[item.asset_match_state] || item.asset_match_state}${item.remark_text ? ',备注:' + item.remark_text : ''}`
+  ).join("；");
+  chatSystemCtx.value = `你是弱电机房运维专家，用简洁中文回答问题。当前分析对象：${group.building_code}/${group.room_code}，共${group.items.length}条巡检记录：${lines}。`;
   showRoomRecordsDialog.value = true;
 }
 
@@ -1275,6 +1283,37 @@ async function requestRoomAiSummary(): Promise<void> {
     roomAiSummary.value = `⚠ ${e instanceof Error ? e.message : "AI 总结失败"}`;
   } finally {
     roomAiSummaryLoading.value = false;
+  }
+}
+
+async function sendChatMessage(): Promise<void> {
+  const text = chatInput.value.trim();
+  if (!text || chatLoading.value) return;
+  chatInput.value = "";
+  chatMessages.value = [...chatMessages.value, { role: "user", content: text }];
+  chatLoading.value = true;
+  try {
+    const msgs: ChatMessage[] = [
+      { role: "system", content: chatSystemCtx.value },
+      ...chatMessages.value,
+    ];
+    const output = await callAiGateway({
+      mode: aiConfig.value.mode,
+      backendBaseUrl: getBackendBaseUrl(),
+      accessToken: getAccessToken(),
+      endpoint: aiConfig.value.endpoint,
+      apiKey: aiConfig.value.apiKey,
+      model: aiConfig.value.model,
+      systemPrompt: "",
+      userPrompt: "",
+      temperature: 0.5,
+      messages: msgs,
+    });
+    chatMessages.value = [...chatMessages.value, { role: "assistant", content: stripMarkdown(output.text) }];
+  } catch (e) {
+    chatMessages.value = [...chatMessages.value, { role: "assistant", content: `⚠ ${e instanceof Error ? e.message : "AI 请求失败"}` }];
+  } finally {
+    chatLoading.value = false;
   }
 }
 
@@ -2414,7 +2453,7 @@ onMounted(async () => {
 
         <div class="actions">
           <button :disabled="roomAiSummaryLoading" @click="requestRoomAiSummary">
-            {{ roomAiSummaryLoading ? "总结中..." : "📋 AI 历史总结" }}
+            {{ roomAiSummaryLoading ? "总结中..." : "📋 AI 一键总结" }}
           </button>
           <button :disabled="roomAiLoading" @click="requestRoomAiAnalysis">
             {{ roomAiLoading ? "分析中..." : "🤖 AI 整体分析" }}
@@ -2423,6 +2462,32 @@ onMounted(async () => {
         </div>
         <p class="error" v-if="roomAiError">{{ roomAiError }}</p>
         <div class="ai-result" v-if="roomAiResult">{{ stripMarkdown(roomAiResult) }}</div>
+
+        <!-- AI 对话 -->
+        <div class="chat-panel">
+          <div class="chat-messages" ref="chatScrollRef">
+            <p class="chat-hint" v-if="!chatMessages.length">可在此向 AI 提问，例如："这个房间最近指示灯频繁异常是什么原因？"</p>
+            <div
+              v-for="(msg, i) in chatMessages"
+              :key="i"
+              class="chat-bubble"
+              :class="msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-ai'"
+            >{{ msg.content }}</div>
+            <div v-if="chatLoading" class="chat-bubble chat-bubble-ai chat-bubble-loading">…</div>
+          </div>
+          <div class="chat-input-row">
+            <input
+              v-model="chatInput"
+              class="chat-input"
+              placeholder="向 AI 提问…"
+              :disabled="chatLoading"
+              @keydown.enter.prevent="sendChatMessage"
+            />
+            <button :disabled="chatLoading || !chatInput.trim()" @click="sendChatMessage">发送</button>
+            <button class="ghost" @click="chatMessages = []">清空</button>
+          </div>
+        </div>
+
         <ul class="task-list" style="margin-top:14px">
           <li v-for="item in roomRecordsGroup.items" :key="item.inspection_id">
             <div class="record-head">

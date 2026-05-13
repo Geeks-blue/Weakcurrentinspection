@@ -46,31 +46,39 @@ async def proxy_chat(
     if not api_key:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="AI API key is missing")
 
-    request_body = {
-        "model": payload.model,
-        "temperature": payload.temperature,
-        "messages": [
-            *(
-                [{"role": "system", "content": payload.system_prompt.strip()}]
-                if payload.system_prompt.strip()
-                else []
-            ),
-            {
-                "role": "user",
-                "content": (
-                    [
-                        {"type": "text", "text": payload.user_prompt},
-                        *[
-                            {"type": "image_url", "image_url": {"url": img}}
-                            for img in payload.images
-                        ],
-                    ]
-                    if payload.images
-                    else payload.user_prompt
+    request_body: dict
+    if payload.messages is not None:
+        request_body = {
+            "model": payload.model,
+            "temperature": payload.temperature,
+            "messages": payload.messages,
+        }
+    else:
+        request_body = {
+            "model": payload.model,
+            "temperature": payload.temperature,
+            "messages": [
+                *(
+                    [{"role": "system", "content": payload.system_prompt.strip()}]
+                    if payload.system_prompt.strip()
+                    else []
                 ),
-            },
-        ],
-    }
+                {
+                    "role": "user",
+                    "content": (
+                        [
+                            {"type": "text", "text": payload.user_prompt},
+                            *[
+                                {"type": "image_url", "image_url": {"url": img}}
+                                for img in payload.images
+                            ],
+                        ]
+                        if payload.images
+                        else payload.user_prompt
+                    ),
+                },
+            ],
+        }
 
     timeout = httpx.Timeout(settings.ai_proxy_timeout_seconds)
     async with httpx.AsyncClient(timeout=timeout) as client:

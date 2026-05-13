@@ -37,6 +37,7 @@ class AssetItemView(BaseModel):
     model: str | None
     note: str | None
     updated_at: datetime
+    photo_url: str | None = None
 
 
 class ImportSummary(BaseModel):

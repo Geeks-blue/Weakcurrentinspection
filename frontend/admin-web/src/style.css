@@ -715,87 +715,59 @@ button.danger {
   flex-shrink: 0;
 }
 
-.vision-assets-panel {
-  margin-top: 16px;
-}
-
-.vision-assets-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: #2c4a8a;
-  margin: 0 0 10px;
-}
-
-.vision-assets-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 12px;
-}
-
-.vision-asset-card {
-  background: #f6f9ff;
-  border: 1px solid #d7e3f7;
+.asset-photo-tooltip {
+  position: absolute;
+  z-index: 1100;
+  pointer-events: none;
+  background: #fff;
+  border: 1px solid #c8d8f4;
   border-radius: 10px;
-  overflow: hidden;
+  box-shadow: 0 6px 24px rgb(30 60 120 / 16%);
+  padding: 6px;
+  width: 180px;
+}
+
+.asset-photo-tooltip-img {
+  width: 168px;
+  height: 126px;
+  object-fit: cover;
+  border-radius: 6px;
+  display: block;
+}
+
+.asset-photo-section {
+  margin-top: 10px;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  gap: 6px;
 }
 
-.vision-asset-thumb {
-  width: 100%;
-  height: 120px;
+.asset-dialog-photo {
+  width: 140px;
+  height: 105px;
   object-fit: cover;
-  background: #e8f0fb;
+  border-radius: 8px;
+  border: 1px solid #c7d8f0;
   cursor: zoom-in;
 }
 
-.vision-asset-thumb-placeholder {
-  width: 100%;
-  height: 120px;
+.asset-dialog-photo-placeholder {
+  width: 140px;
+  height: 105px;
   background: #eef3fb;
+  border: 1px dashed #b8cce8;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 32px;
-  color: #b0c4e0;
+  font-size: 12px;
+  color: #96a8c8;
 }
 
-.vision-asset-info {
-  padding: 8px 10px;
+.asset-photo-actions {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.vision-asset-name {
-  font-size: 13px;
-  font-weight: 700;
-  color: #1e3a7a;
-}
-
-.vision-asset-location {
-  font-size: 11px;
-  color: #6a7ea8;
-}
-
-.vision-asset-status {
-  font-size: 11px;
-  font-weight: 600;
-  color: #5a8a5a;
-}
-
-.vision-asset-status.status-ok {
-  color: #3a7a3a;
-}
-
-.vision-asset-status.status-warn {
-  color: #c05010;
-}
-
-.vision-asset-model {
-  font-size: 11px;
-  color: #7a90b8;
-  font-style: italic;
+  gap: 6px;
 }
 
 .result {

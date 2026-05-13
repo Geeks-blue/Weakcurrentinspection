@@ -207,6 +207,7 @@ export interface AssetItemView {
   model: string | null;
   note: string | null;
   updated_at: string;
+  photo_url: string | null;
 }
 
 export interface ImportSummary {

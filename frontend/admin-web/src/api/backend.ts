@@ -100,6 +100,32 @@ export async function deleteAsset(asset_id: number): Promise<{ ok: boolean }> {
 export function getAssetQrcodeUrl(asset_id: number): string {
   return `${getBackendBaseUrl()}/assets/item/${asset_id}/qrcode?token=${getAccessToken()}`;
 }
+
+export async function uploadAssetPhoto(asset_id: number, file: File): Promise<string> {
+  const token = getAccessToken();
+  const form = new FormData();
+  form.append("file", file);
+  const response = await fetch(`${getBackendBaseUrl()}/assets/item/${asset_id}/photo`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(`上传资产照片失败：${readErrorDetail(data)}`);
+  return (data as { photo_url: string }).photo_url;
+}
+
+export async function deleteAssetPhoto(asset_id: number): Promise<void> {
+  const token = getAccessToken();
+  const response = await fetch(`${getBackendBaseUrl()}/assets/item/${asset_id}/photo`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok && response.status !== 204) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(`删除资产照片失败：${readErrorDetail(data)}`);
+  }
+}
 // 文件说明：该文件为弱电巡检系统源码，已按中文注释规范维护。
 import type {
   ConsoleInspectionItem,

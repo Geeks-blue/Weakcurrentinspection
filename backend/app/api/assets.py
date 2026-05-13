@@ -1,17 +1,36 @@
 from datetime import datetime
 from io import BytesIO, StringIO
+from pathlib import Path
+from uuid import uuid4
 
 import qrcode
-from fastapi import APIRouter, Body, Depends, File, HTTPException, Response, UploadFile, status
+from fastapi import APIRouter, Body, Depends, File, HTTPException, Request, Response, UploadFile, status
+from fastapi.responses import FileResponse
 from openpyxl import load_workbook
 from sqlalchemy import Column, DateTime, Integer, String
 from sqlalchemy.orm import Session, declarative_base
 
 from app.deps import get_current_user, get_db, require_teacher_or_admin
-from app.models.entities import Asset, Building, Room, User
+from app.models.entities import Asset, AssetPhoto, Building, Room, User
 from app.schemas.assets import AssetItemView, AssetRoomCreate, AssetRoomItem, ImportSummary
 
 router = APIRouter()
+
+ASSET_PHOTO_DIR = Path(__file__).resolve().parents[2] / "storage" / "asset_photos"
+ASSET_PHOTO_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _asset_photo_url(request, object_key: str) -> str:
+    return str(request.url_for("get_asset_photo", object_key=object_key))
+
+
+def _get_asset_photo_url(request, asset_id: int, db: Session) -> str | None:
+    photo = db.query(AssetPhoto).filter(AssetPhoto.asset_id == asset_id).first()
+    if photo:
+        return _asset_photo_url(request, photo.object_key)
+    return None
+
+
 BaseTmp = declarative_base()
 
 class RoomSignLog(BaseTmp):
@@ -219,6 +238,7 @@ def create_asset(item: AssetItemView, db: Session = Depends(get_db), _: User = D
         model=asset.model,
         note=asset.note,
         updated_at=asset.updated_at,
+        photo_url=None,
     )
 
 @router.put("/item/{asset_id}", response_model=AssetItemView)
@@ -254,6 +274,7 @@ def update_asset(asset_id: int, item: AssetItemView, db: Session = Depends(get_d
         model=asset.model,
         note=asset.note,
         updated_at=asset.updated_at,
+        photo_url=None,
     )
 
 @router.delete("/item/{asset_id}")
@@ -359,6 +380,7 @@ def list_rooms(
 @router.get("/room-assets/{room_code}", response_model=list[AssetItemView])
 def get_room_assets(
     room_code: str,
+    request: Request = None,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ) -> list[AssetItemView]:
@@ -370,6 +392,8 @@ def get_room_assets(
         .order_by(Asset.asset_code.asc())
         .all()
     )
+    asset_ids = [asset.id for asset, _, _ in rows]
+    photos = {p.asset_id: p.object_key for p in db.query(AssetPhoto).filter(AssetPhoto.asset_id.in_(asset_ids)).all()}
     return [
         AssetItemView(
             asset_id=asset.id,
@@ -384,6 +408,7 @@ def get_room_assets(
             model=asset.model,
             note=asset.note,
             updated_at=asset.updated_at,
+            photo_url=_asset_photo_url(request, photos[asset.id]) if request and asset.id in photos else None,
         )
         for asset, room, building in rows
     ]
@@ -391,6 +416,7 @@ def get_room_assets(
 
 @router.get("/items", response_model=list[AssetItemView])
 def list_assets(
+    request: Request = None,
     db: Session = Depends(get_db),
     _: User = Depends(require_teacher_or_admin),
 ) -> list[AssetItemView]:
@@ -401,6 +427,8 @@ def list_assets(
         .order_by(Asset.updated_at.desc())
         .all()
     )
+    asset_ids = [asset.id for asset, _, _ in rows]
+    photos = {p.asset_id: p.object_key for p in db.query(AssetPhoto).filter(AssetPhoto.asset_id.in_(asset_ids)).all()}
     return [
         AssetItemView(
             asset_id=asset.id,
@@ -415,9 +443,71 @@ def list_assets(
             model=asset.model,
             note=asset.note,
             updated_at=asset.updated_at,
+            photo_url=_asset_photo_url(request, photos[asset.id]) if request and asset.id in photos else None,
         )
         for asset, room, building in rows
     ]
+
+
+@router.get("/item/{asset_id}/photo")
+def get_asset_photo(asset_id: int, db: Session = Depends(get_db), _: User = Depends(get_current_user)) -> FileResponse:
+    photo = db.query(AssetPhoto).filter(AssetPhoto.asset_id == asset_id).first()
+    if not photo:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No photo for this asset")
+    file_path = ASSET_PHOTO_DIR / photo.object_key
+    if not file_path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Photo file not found")
+    return FileResponse(file_path)
+
+
+@router.get("/photos/{object_key}")
+def get_asset_photo_by_key(object_key: str, _: User = Depends(get_current_user)) -> FileResponse:
+    file_path = ASSET_PHOTO_DIR / object_key
+    if not file_path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Photo not found")
+    return FileResponse(file_path)
+
+
+@router.post("/item/{asset_id}/photo")
+async def upload_asset_photo(
+    asset_id: int,
+    file: UploadFile = File(...),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_teacher_or_admin),
+) -> dict:
+    asset = db.query(Asset).filter(Asset.id == asset_id).first()
+    if not asset:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found")
+
+    data = await file.read()
+    ext = (file.filename or "photo.jpg").rsplit(".", 1)[-1].lower()
+    object_key = f"{uuid4().hex}.{ext}"
+    (ASSET_PHOTO_DIR / object_key).write_bytes(data)
+
+    existing = db.query(AssetPhoto).filter(AssetPhoto.asset_id == asset_id).first()
+    if existing:
+        old_file = ASSET_PHOTO_DIR / existing.object_key
+        if old_file.exists():
+            old_file.unlink(missing_ok=True)
+        existing.object_key = object_key
+    else:
+        db.add(AssetPhoto(asset_id=asset_id, object_key=object_key))
+    db.commit()
+    return {"photo_url": _asset_photo_url(request, object_key)}
+
+
+@router.delete("/item/{asset_id}/photo", status_code=status.HTTP_204_NO_CONTENT)
+def delete_asset_photo(
+    asset_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_teacher_or_admin),
+) -> None:
+    photo = db.query(AssetPhoto).filter(AssetPhoto.asset_id == asset_id).first()
+    if photo:
+        (ASSET_PHOTO_DIR / photo.object_key).unlink(missing_ok=True)
+        db.delete(photo)
+        db.commit()
 
 
 @router.post("/import/rooms", response_model=ImportSummary)

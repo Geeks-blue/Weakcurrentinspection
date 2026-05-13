@@ -2,17 +2,18 @@
 // 文件说明：该页面是管理端核心交互页面，按中文注释规范维护。
 import { computed, onMounted, ref } from "vue";
 
-import { callAiGateway, extractJsonArray, stripMarkdown, type ChatMessage } from "./api/ai";
+import { callAiGateway, stripMarkdown, type ChatMessage } from "./api/ai";
 import {
   getAssetRooms,
   getAssets,
   importAssetsTable,
   importRoomsTable,
+  uploadAssetPhoto,
+  deleteAssetPhoto,
   clearAccessToken,
   createTaskAssignment,
   deleteTaskAssignment,
   deleteInspectionRecord,
-  getPhotoDataUrl,
   deleteUser,
   listUsers,
   updateUser,
@@ -118,118 +119,6 @@ const reviewReason = ref("");
 const reviewLoading = ref(false);
 const reviewMessage = ref("");
 
-interface VisionAsset {
-  name: string;
-  location: string;
-  status: string;
-  model: string | null;
-  row_frac: number;
-  col_frac: number;
-  thumbnail: string | null;
-}
-
-const visionAssets = ref<VisionAsset[]>([]);
-const visionLoading = ref(false);
-const visionError = ref("");
-
-async function fetchImageAsBase64(url: string): Promise<string> {
-  const key = url.split("/").pop() ?? "";
-  if (!key) throw new Error("无法解析照片路径");
-  return getPhotoDataUrl(key);
-}
-
-function cropImageToDataUrl(
-  dataUrl: string,
-  rowFrac: number,
-  colFrac: number,
-  cropW = 240,
-  cropH = 180
-): Promise<string> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = cropW;
-      canvas.height = cropH;
-      const ctx = canvas.getContext("2d")!;
-      const cx = colFrac * img.width;
-      const cy = rowFrac * img.height;
-      const sx = Math.max(0, cx - cropW / 2);
-      const sy = Math.max(0, cy - cropH / 2);
-      const sw = Math.min(cropW, img.width - sx);
-      const sh = Math.min(cropH, img.height - sy);
-      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, cropW, cropH);
-      resolve(canvas.toDataURL("image/jpeg", 0.85));
-    };
-    img.src = dataUrl;
-  });
-}
-
-async function requestVisionAssets(): Promise<void> {
-  if (!detailItem.value) return;
-  const item = detailItem.value;
-  if (!item.photo_urls.length) {
-    visionError.value = "该巡检记录无照片，无法进行视觉识别。";
-    return;
-  }
-
-  visionLoading.value = true;
-  visionError.value = "";
-  visionAssets.value = [];
-
-  try {
-    const imageDataUrls = await Promise.all(
-      item.photo_urls.slice(0, 2).map(fetchImageAsBase64)
-    );
-
-    const prompt = `请分析这${imageDataUrls.length}张弱电机房巡检照片，识别所有可见设备。
-以JSON数组格式返回，每个设备包含：
-- name: 设备名称（如：服务器、交换机、配线架、UPS、路由器、光纤收发器等）
-- location: 位置描述（如：上层左侧第1台）
-- status: 从照片观察的运行状态（正常/指示灯异常/损坏/缺失/未知）
-- model: 品牌型号（无法识别则为null）
-- row_frac: 设备中心在第一张照片中的垂直比例（0.0=顶部, 1.0=底部）
-- col_frac: 设备中心在第一张照片中的水平比例（0.0=左侧, 1.0=右侧）
-房间：${item.building_code} / ${item.room_code}
-仅返回JSON数组，不要其他文字。`;
-
-    const output = await callAiGateway({
-      mode: aiConfig.value.mode,
-      backendBaseUrl: getBackendBaseUrl(),
-      accessToken: getAccessToken(),
-      endpoint: aiConfig.value.endpoint,
-      apiKey: aiConfig.value.apiKey,
-      model: aiConfig.value.model,
-      systemPrompt: "你是弱电机房设备识别专家，能够从照片中准确识别各类网络、服务器和机房设备。",
-      userPrompt: prompt,
-      temperature: 0.1,
-      images: imageDataUrls,
-    });
-
-    let parsed: VisionAsset[] | null = extractJsonArray<VisionAsset>(output.text);
-    if (!parsed) {
-      visionError.value = "AI 未返回结构化结果：" + output.text.slice(0, 120);
-      return;
-    }
-
-    const firstImg = imageDataUrls[0];
-    visionAssets.value = await Promise.all(
-      parsed.map(async (asset) => {
-        let thumbnail: string | null = null;
-        if (firstImg && typeof asset.row_frac === "number" && typeof asset.col_frac === "number") {
-          try {
-            thumbnail = await cropImageToDataUrl(firstImg, asset.row_frac, asset.col_frac);
-          } catch { /* ignore crop errors */ }
-        }
-        return { ...asset, thumbnail };
-      })
-    );
-  } catch (e) {
-    visionError.value = e instanceof Error ? e.message : "视觉识别失败";
-  } finally {
-    visionLoading.value = false;
-  }
-}
 
 const showRoomCompareDialog = ref(false);
 const compareRoomCode = ref("");
@@ -245,6 +134,7 @@ const hoverRoomAssets = computed(() =>
 );
 
 function onRoomMouseEnter(e: MouseEvent, roomCode: string): void {
+  hoverAssetId.value = null;
   hoverRoomCode.value = roomCode;
   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
   hoverTooltipY.value = rect.top + window.scrollY;
@@ -253,6 +143,62 @@ function onRoomMouseEnter(e: MouseEvent, roomCode: string): void {
 
 function onRoomMouseLeave(): void {
   hoverRoomCode.value = null;
+}
+
+const hoverAssetId = ref<number | null>(null);
+const hoverAssetPhotoUrl = ref<string | null>(null);
+const hoverAssetTooltipY = ref(0);
+const hoverAssetTooltipX = ref(0);
+
+function onAssetMouseEnter(e: MouseEvent, asset: AssetItemView): void {
+  hoverRoomCode.value = null;
+  hoverAssetId.value = asset.asset_id;
+  hoverAssetPhotoUrl.value = asset.photo_url ?? null;
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+  hoverAssetTooltipY.value = rect.top + window.scrollY;
+  hoverAssetTooltipX.value = rect.right + 8;
+}
+
+function onAssetMouseLeave(): void {
+  hoverAssetId.value = null;
+}
+
+const assetPhotoUploadInput = ref<HTMLInputElement | null>(null);
+const assetPhotoUploading = ref(false);
+const assetPhotoError = ref("");
+
+async function handleAssetPhotoUpload(e: Event): Promise<void> {
+  const file = (e.target as HTMLInputElement).files?.[0];
+  if (!file || !actionAsset.value) return;
+  assetPhotoUploading.value = true;
+  assetPhotoError.value = "";
+  try {
+    const url = await uploadAssetPhoto(actionAsset.value.asset_id, file);
+    const idx = assets.value.findIndex(a => a.asset_id === actionAsset.value!.asset_id);
+    if (idx !== -1) assets.value[idx] = { ...assets.value[idx], photo_url: url };
+    if (actionAsset.value) actionAsset.value = { ...actionAsset.value, photo_url: url };
+  } catch (err) {
+    assetPhotoError.value = err instanceof Error ? err.message : "上传失败";
+  } finally {
+    assetPhotoUploading.value = false;
+    if (assetPhotoUploadInput.value) assetPhotoUploadInput.value.value = "";
+  }
+}
+
+async function handleAssetPhotoDelete(): Promise<void> {
+  if (!actionAsset.value) return;
+  assetPhotoUploading.value = true;
+  assetPhotoError.value = "";
+  try {
+    await deleteAssetPhoto(actionAsset.value.asset_id);
+    const idx = assets.value.findIndex(a => a.asset_id === actionAsset.value!.asset_id);
+    if (idx !== -1) assets.value[idx] = { ...assets.value[idx], photo_url: null };
+    if (actionAsset.value) actionAsset.value = { ...actionAsset.value, photo_url: null };
+  } catch (err) {
+    assetPhotoError.value = err instanceof Error ? err.message : "删除失败";
+  } finally {
+    assetPhotoUploading.value = false;
+  }
 }
 
 async function openRoomCompare(room: AssetRoomItem): Promise<void> {
@@ -1147,8 +1093,6 @@ function openInspectionDetail(item: ConsoleInspectionItem): void {
   detailItem.value = item;
   detailAiResult.value = "";
   detailAiError.value = "";
-  visionAssets.value = [];
-  visionError.value = "";
   showInspectionDetailDialog.value = true;
 }
 
@@ -2257,6 +2201,8 @@ onMounted(async () => {
                           class="room-row building-room-row"
                           :class="{ 'room-row-selected': selectedAssetId === asset.asset_id }"
                           @click="openAssetActionDialog(asset)"
+                          @mouseenter="onAssetMouseEnter($event, asset)"
+                          @mouseleave="onAssetMouseLeave"
                         >
                           <td style="padding-left:28px">{{ asset.building_code }} / {{ asset.room_code }}</td>
                           <td>{{ asset.quantity }}</td>
@@ -2286,6 +2232,8 @@ onMounted(async () => {
                       class="room-row"
                       :class="{ 'room-row-selected': selectedAssetId === asset.asset_id }"
                       @click="openAssetActionDialog(asset)"
+                      @mouseenter="onAssetMouseEnter($event, asset)"
+                      @mouseleave="onAssetMouseLeave"
                     >
                       <td>{{ asset.asset_code }}</td>
                       <td>{{ asset.asset_name }}</td>
@@ -2535,41 +2483,11 @@ onMounted(async () => {
           <img v-for="url in detailItem.photo_urls" :key="url" :src="url" alt="巡检照片" @click="openPhotoPreview(url)" />
         </div>
         <div class="actions">
-          <button :disabled="visionLoading" @click="requestVisionAssets">
-            {{ visionLoading ? "识别中..." : "🔍 AI 视觉识别设备" }}
-          </button>
           <button :disabled="detailAiLoading" @click="requestAiAnalysis">
             {{ detailAiLoading ? "分析中..." : "🤖 AI 文字分析" }}
           </button>
           <button class="ghost" @click="showInspectionDetailDialog = false">关闭</button>
         </div>
-        <p class="error" v-if="visionError">{{ visionError }}</p>
-
-        <!-- 视觉识别设备卡片 -->
-        <div v-if="visionAssets.length > 0" class="vision-assets-panel">
-          <h4 class="vision-assets-title">📦 识别到 {{ visionAssets.length }} 件设备</h4>
-          <div class="vision-assets-grid">
-            <div v-for="(asset, idx) in visionAssets" :key="idx" class="vision-asset-card">
-              <img
-                v-if="asset.thumbnail"
-                :src="asset.thumbnail"
-                class="vision-asset-thumb"
-                @click="openPhotoPreview(asset.thumbnail!)"
-              />
-              <div v-else class="vision-asset-thumb-placeholder">📷</div>
-              <div class="vision-asset-info">
-                <span class="vision-asset-name">{{ asset.name }}</span>
-                <span class="vision-asset-location">{{ asset.location }}</span>
-                <span
-                  class="vision-asset-status"
-                  :class="asset.status === '正常' ? 'status-ok' : asset.status === '未知' ? '' : 'status-warn'"
-                >{{ asset.status }}</span>
-                <span v-if="asset.model" class="vision-asset-model">{{ asset.model }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <p class="error" v-if="detailAiError">{{ detailAiError }}</p>
         <div class="ai-result" v-if="detailAiResult">{{ stripMarkdown(detailAiResult) }}</div>
       </div>
@@ -2591,6 +2509,15 @@ onMounted(async () => {
         <span class="room-asset-tooltip-name">{{ asset.asset_name }}</span>
         <span class="room-asset-tooltip-qty">× {{ asset.quantity }}</span>
       </div>
+    </div>
+
+    <!-- 资产照片悬停预览 -->
+    <div
+      v-if="hoverAssetId && hoverAssetPhotoUrl"
+      class="asset-photo-tooltip"
+      :style="{ top: hoverAssetTooltipY + 'px', left: hoverAssetTooltipX + 'px' }"
+    >
+      <img :src="hoverAssetPhotoUrl" class="asset-photo-tooltip-img" />
     </div>
 
     <!-- 房间巡检历史照片对比弹窗 -->
@@ -2823,6 +2750,29 @@ onMounted(async () => {
           <div class="dialog-qr-col">
             <img :src="getAssetQrcodeUrl(actionAsset.asset_id)" alt="二维码" class="dialog-qr-img" />
             <a :href="getAssetQrcodeUrl(actionAsset.asset_id)" download="二维码.png" target="_blank" class="qr-download-link">下载二维码</a>
+            <div class="asset-photo-section">
+              <img
+                v-if="actionAsset.photo_url"
+                :src="actionAsset.photo_url"
+                class="asset-dialog-photo"
+                @click="openPhotoPreview(actionAsset.photo_url!)"
+              />
+              <div v-else class="asset-dialog-photo-placeholder">暂无照片</div>
+              <input
+                ref="assetPhotoUploadInput"
+                type="file"
+                accept="image/*"
+                style="display:none"
+                @change="handleAssetPhotoUpload"
+              />
+              <div class="asset-photo-actions">
+                <button class="ghost btn-sm" :disabled="assetPhotoUploading" @click="assetPhotoUploadInput?.click()">
+                  {{ assetPhotoUploading ? "上传中…" : actionAsset.photo_url ? "更换照片" : "添加照片" }}
+                </button>
+                <button class="danger btn-sm" v-if="actionAsset.photo_url" :disabled="assetPhotoUploading" @click="handleAssetPhotoDelete">删除照片</button>
+              </div>
+              <p class="error" v-if="assetPhotoError" style="font-size:11px">{{ assetPhotoError }}</p>
+            </div>
           </div>
         </div>
         <div class="actions">

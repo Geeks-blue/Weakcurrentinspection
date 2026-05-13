@@ -92,6 +92,17 @@ class Asset(Base):
     room: Mapped["Room"] = relationship()
 
 
+class AssetPhoto(Base):
+    __tablename__ = "asset_photos"
+
+    id: Mapped[int] = mapped_column(BIGINT, primary_key=True)
+    asset_id: Mapped[int] = mapped_column(BIGINT, ForeignKey("assets.id"), unique=True, nullable=False, index=True)
+    object_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
 class InspectionTask(Base):
     __tablename__ = "inspection_tasks"
 

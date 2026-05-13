@@ -21,7 +21,7 @@ ASSET_PHOTO_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _asset_photo_url(request, object_key: str) -> str:
-    return str(request.url_for("get_asset_photo", object_key=object_key))
+    return str(request.url_for("get_asset_photo_by_key", object_key=object_key))
 
 
 def _get_asset_photo_url(request, asset_id: int, db: Session) -> str | None:
@@ -461,7 +461,7 @@ def get_asset_photo(asset_id: int, db: Session = Depends(get_db), _: User = Depe
 
 
 @router.get("/photos/{object_key}")
-def get_asset_photo_by_key(object_key: str, _: User = Depends(get_current_user)) -> FileResponse:
+def get_asset_photo_by_key(object_key: str) -> FileResponse:
     file_path = ASSET_PHOTO_DIR / object_key
     if not file_path.exists():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Photo not found")

@@ -115,6 +115,25 @@ const compareRoomCode = ref("");
 const compareInspections = ref<ConsoleInspectionItem[]>([]);
 const compareLoading = ref(false);
 
+const hoverRoomCode = ref<string | null>(null);
+const hoverTooltipY = ref(0);
+const hoverTooltipX = ref(0);
+
+const hoverRoomAssets = computed(() =>
+  hoverRoomCode.value ? assets.value.filter(a => a.room_code === hoverRoomCode.value) : []
+);
+
+function onRoomMouseEnter(e: MouseEvent, roomCode: string): void {
+  hoverRoomCode.value = roomCode;
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+  hoverTooltipY.value = rect.top + window.scrollY;
+  hoverTooltipX.value = rect.right + 8;
+}
+
+function onRoomMouseLeave(): void {
+  hoverRoomCode.value = null;
+}
+
 async function openRoomCompare(room: AssetRoomItem): Promise<void> {
   compareRoomCode.value = room.room_code;
   compareInspections.value = [];
@@ -1973,9 +1992,10 @@ onMounted(async () => {
                           :key="room.room_id"
                           class="room-row building-room-row"
                           :class="{ 'room-row-selected': selectedRoomId === room.room_id }"
-                          :title="`${room.room_code}｜${room.floor_label || ''}｜${room.location_text || ''}｜资产 ${roomAssetCount[room.room_code] || 0} 件`"
                           @click="openRoomActionDialog(room)"
                           @dblclick.stop="openRoomCompare(room)"
+                          @mouseenter="onRoomMouseEnter($event, room.room_code)"
+                          @mouseleave="onRoomMouseLeave"
                         >
                           <td>{{ room.room_code }}</td>
                           <td>{{ room.floor_label || "-" }}</td>
@@ -2290,6 +2310,19 @@ onMounted(async () => {
     <div class="photo-lightbox" v-if="previewPhotoUrl" @click.self="closePhotoPreview">
       <button class="photo-lightbox-close" @click="closePhotoPreview">关闭</button>
       <img :src="previewPhotoUrl" alt="巡检照片预览" />
+    </div>
+
+    <!-- 房间资产悬停预览 -->
+    <div
+      v-if="hoverRoomCode && hoverRoomAssets.length"
+      class="room-asset-tooltip"
+      :style="{ top: hoverTooltipY + 'px', left: hoverTooltipX + 'px' }"
+    >
+      <div class="room-asset-tooltip-title">{{ hoverRoomCode }} 资产清单</div>
+      <div v-for="asset in hoverRoomAssets" :key="asset.asset_id" class="room-asset-tooltip-row">
+        <span class="room-asset-tooltip-name">{{ asset.asset_name }}</span>
+        <span class="room-asset-tooltip-qty">× {{ asset.quantity }}</span>
+      </div>
     </div>
 
     <!-- 房间巡检历史照片对比弹窗 -->

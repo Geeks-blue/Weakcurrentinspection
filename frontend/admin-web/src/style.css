@@ -810,6 +810,39 @@ button.danger {
   word-break: break-word;
 }
 
+.ai-result {
+  margin-top: 12px;
+  background: #f4f8ff;
+  border: 1px solid #d0e0f8;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: #253460;
+  white-space: pre-line;
+  word-break: break-word;
+}
+
+.ai-summary-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: linear-gradient(90deg, #eef5ff 0%, #f5f0ff 100%);
+  border: 1px solid #c8d8f8;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  font-size: 13.5px;
+  color: #1e3878;
+  line-height: 1.6;
+}
+
+.ai-summary-icon {
+  flex-shrink: 0;
+  font-size: 16px;
+  margin-top: 1px;
+}
+
 .dialog-mask {
   position: fixed;
   inset: 0;

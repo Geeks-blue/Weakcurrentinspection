@@ -2,7 +2,7 @@
 // 文件说明：该页面是管理端核心交互页面，按中文注释规范维护。
 import { computed, onMounted, ref } from "vue";
 
-import { callAiGateway } from "./api/ai";
+import { callAiGateway, stripMarkdown } from "./api/ai";
 import {
   getAssetRooms,
   getAssets,
@@ -97,6 +97,8 @@ const roomRecordsGroup = ref<RoomInspectionGroup | null>(null);
 const roomAiLoading = ref(false);
 const roomAiResult = ref("");
 const roomAiError = ref("");
+const roomAiSummary = ref("");
+const roomAiSummaryLoading = ref(false);
 
 const showInspectionDetailDialog = ref(false);
 const detailItem = ref<ConsoleInspectionItem | null>(null);
@@ -1201,6 +1203,7 @@ function openRoomRecords(group: RoomInspectionGroup): void {
   roomRecordsGroup.value = group;
   roomAiResult.value = "";
   roomAiError.value = "";
+  roomAiSummary.value = "";
   showRoomRecordsDialog.value = true;
 }
 
@@ -1237,6 +1240,41 @@ async function requestRoomAiAnalysis(): Promise<void> {
     roomAiError.value = e instanceof Error ? e.message : "AI 分析失败";
   } finally {
     roomAiLoading.value = false;
+  }
+}
+
+async function requestRoomAiSummary(): Promise<void> {
+  if (!roomRecordsGroup.value) return;
+  const group = roomRecordsGroup.value;
+  const lockMap: Record<string, string> = { locked: "已锁", unlocked: "未锁", lock_damaged: "门锁损坏" };
+  const clutterMap: Record<string, string> = { none: "无杂物", stacked_items: "有堆放物品", water: "有积水", odor: "有异味" };
+  const indicatorMap: Record<string, string> = { all_ok: "全部正常", partial_abnormal: "个别异常", all_abnormal: "全部异常" };
+  const assetMap: Record<string, string> = { matched: "与台账一致", missing: "资产缺失", extra: "资产多余", moved: "位置变动" };
+  const lines = group.items.map((item, i) =>
+    `${i + 1}.（${new Date(item.submitted_at).toLocaleDateString()}）${formatStatus(item.status)}，锁=${lockMap[item.lock_state] || item.lock_state}，杂物=${clutterMap[item.clutter_state] || item.clutter_state}，指示灯=${indicatorMap[item.indicator_state] || item.indicator_state}，资产=${assetMap[item.asset_match_state] || item.asset_match_state}`
+  ).join("；");
+
+  const prompt = `机房 ${group.building_code}/${group.room_code} 共 ${group.items.length} 条巡检记录：${lines}。请用1-2句中文给出简明总结：整体状况如何、最需关注的问题是什么。不要列表，不要标题，只输出纯文字。`;
+
+  roomAiSummaryLoading.value = true;
+  roomAiSummary.value = "";
+  try {
+    const output = await callAiGateway({
+      mode: aiConfig.value.mode,
+      backendBaseUrl: getBackendBaseUrl(),
+      accessToken: getAccessToken(),
+      endpoint: aiConfig.value.endpoint,
+      apiKey: aiConfig.value.apiKey,
+      model: aiConfig.value.model,
+      systemPrompt: "你是弱电机房运维专家，用简洁中文总结巡检历史，不超过两句话。",
+      userPrompt: prompt,
+      temperature: 0.3,
+    });
+    roomAiSummary.value = stripMarkdown(output.text);
+  } catch (e) {
+    roomAiSummary.value = `⚠ ${e instanceof Error ? e.message : "AI 总结失败"}`;
+  } finally {
+    roomAiSummaryLoading.value = false;
   }
 }
 
@@ -2366,14 +2404,25 @@ onMounted(async () => {
     <div v-if="showRoomRecordsDialog && roomRecordsGroup" class="dialog-mask" @click.self="showRoomRecordsDialog = false">
       <div class="dialog-panel dialog-panel-wide">
         <h3>{{ roomRecordsGroup.building_code }} / {{ roomRecordsGroup.room_code }} · {{ roomRecordsGroup.items.length }} 条记录</h3>
+
+        <!-- AI 一句话总结 -->
+        <div class="ai-summary-bar" v-if="roomAiSummary">
+          <span class="ai-summary-icon">🧠</span>
+          <span>{{ roomAiSummary }}</span>
+        </div>
+        <p class="hint" v-else-if="roomAiSummaryLoading" style="font-style:italic">AI 正在生成总结…</p>
+
         <div class="actions">
+          <button :disabled="roomAiSummaryLoading" @click="requestRoomAiSummary">
+            {{ roomAiSummaryLoading ? "总结中..." : "📋 AI 历史总结" }}
+          </button>
           <button :disabled="roomAiLoading" @click="requestRoomAiAnalysis">
             {{ roomAiLoading ? "分析中..." : "🤖 AI 整体分析" }}
           </button>
           <button class="ghost" @click="showRoomRecordsDialog = false">关闭</button>
         </div>
         <p class="error" v-if="roomAiError">{{ roomAiError }}</p>
-        <pre class="result" v-if="roomAiResult">{{ roomAiResult }}</pre>
+        <div class="ai-result" v-if="roomAiResult">{{ stripMarkdown(roomAiResult) }}</div>
         <ul class="task-list" style="margin-top:14px">
           <li v-for="item in roomRecordsGroup.items" :key="item.inspection_id">
             <div class="record-head">
@@ -2457,7 +2506,7 @@ onMounted(async () => {
         </div>
 
         <p class="error" v-if="detailAiError">{{ detailAiError }}</p>
-        <pre class="result" v-if="detailAiResult">{{ detailAiResult }}</pre>
+        <div class="ai-result" v-if="detailAiResult">{{ stripMarkdown(detailAiResult) }}</div>
       </div>
     </div>
 

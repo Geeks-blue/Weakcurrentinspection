@@ -17,7 +17,7 @@ class Settings:
     ai_provider_api_key: str = os.getenv("AI_PROVIDER_API_KEY", "")
     ai_default_endpoint: str = os.getenv("AI_DEFAULT_ENDPOINT", "https://api.openai.com/v1/chat/completions")
     ai_default_model: str = os.getenv("AI_DEFAULT_MODEL", "gpt-4o-mini")
-    ai_proxy_timeout_seconds: int = int(os.getenv("AI_PROXY_TIMEOUT_SECONDS", "30"))
+    ai_proxy_timeout_seconds: int = int(os.getenv("AI_PROXY_TIMEOUT_SECONDS", "90"))
     cors_allow_origins: str = os.getenv(
         "CORS_ALLOW_ORIGINS",
         "*",

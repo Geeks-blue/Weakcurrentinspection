@@ -17,6 +17,19 @@ export interface AiResponseOutput {
   text: string;
 }
 
+export function stripMarkdown(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, (m) => m.replace(/```\w*\n?/g, "").trim())
+    .replace(/^#{1,6}\s+(.*)$/gm, "$1")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/\*(.*?)\*/g, "$1")
+    .replace(/^[-*+]\s+/gm, "• ")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function extractText(payload: any): string {
   if (payload?.choices?.[0]?.message?.content) {
     return String(payload.choices[0].message.content);
@@ -40,6 +53,12 @@ async function parseResponse(response: Response): Promise<any> {
   } catch {
     return { raw_text: text };
   }
+}
+
+function is502orTimeout(e: unknown): boolean {
+  if (!(e instanceof Error)) return false;
+  const msg = e.message;
+  return msg.includes("502") || msg.includes("timeout") || msg.includes("超时") || msg.includes("Timeout");
 }
 
 async function callDirect(input: AiRequestInput): Promise<AiResponseOutput> {
@@ -120,10 +139,15 @@ async function callByBackendProxy(input: AiRequestInput): Promise<AiResponseOutp
 }
 
 export async function callAiGateway(input: AiRequestInput): Promise<AiResponseOutput> {
-  if (input.mode === "backend_proxy") {
-    return callByBackendProxy(input);
+  const fn = input.mode === "backend_proxy" ? callByBackendProxy : callDirect;
+  try {
+    return await fn(input);
+  } catch (e) {
+    if (is502orTimeout(e)) {
+      await new Promise<void>(r => setTimeout(r, 3000));
+      return fn(input);
+    }
+    throw e;
   }
-
-  return callDirect(input);
 }
 

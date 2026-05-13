@@ -671,6 +671,8 @@ function openAssetActionDialog(asset: AssetItemView): void {
   editingAsset.value = { ...asset };
   editingAssetId.value = asset.asset_id;
   actionAsset.value = asset;
+  assetPhotoError.value = "";
+  showAssetActionDialog.value = true;
 }
 
 function editSelectedAsset(): void {

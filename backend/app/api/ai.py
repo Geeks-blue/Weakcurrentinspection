@@ -55,7 +55,20 @@ async def proxy_chat(
                 if payload.system_prompt.strip()
                 else []
             ),
-            {"role": "user", "content": payload.user_prompt},
+            {
+                "role": "user",
+                "content": (
+                    [
+                        {"type": "text", "text": payload.user_prompt},
+                        *[
+                            {"type": "image_url", "image_url": {"url": img}}
+                            for img in payload.images
+                        ],
+                    ]
+                    if payload.images
+                    else payload.user_prompt
+                ),
+            },
         ],
     }
 

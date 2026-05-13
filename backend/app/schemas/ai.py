@@ -9,6 +9,7 @@ class AiProxyChatRequest(BaseModel):
     system_prompt: str = Field(default="")
     user_prompt: str = Field(..., min_length=1)
     temperature: float = Field(default=0.2, ge=0, le=2)
+    images: list[str] = Field(default_factory=list)
 
 
 class AiProxyChatResponse(BaseModel):

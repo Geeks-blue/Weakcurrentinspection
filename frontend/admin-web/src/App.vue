@@ -110,6 +110,132 @@ const reviewReason = ref("");
 const reviewLoading = ref(false);
 const reviewMessage = ref("");
 
+interface VisionAsset {
+  name: string;
+  location: string;
+  status: string;
+  model: string | null;
+  row_frac: number;
+  col_frac: number;
+  thumbnail: string | null;
+}
+
+const visionAssets = ref<VisionAsset[]>([]);
+const visionLoading = ref(false);
+const visionError = ref("");
+
+async function fetchImageAsBase64(url: string): Promise<string> {
+  const response = await fetch(url);
+  const blob = await response.blob();
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+function cropImageToDataUrl(
+  dataUrl: string,
+  rowFrac: number,
+  colFrac: number,
+  cropW = 240,
+  cropH = 180
+): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = cropW;
+      canvas.height = cropH;
+      const ctx = canvas.getContext("2d")!;
+      const cx = colFrac * img.width;
+      const cy = rowFrac * img.height;
+      const sx = Math.max(0, cx - cropW / 2);
+      const sy = Math.max(0, cy - cropH / 2);
+      const sw = Math.min(cropW, img.width - sx);
+      const sh = Math.min(cropH, img.height - sy);
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, cropW, cropH);
+      resolve(canvas.toDataURL("image/jpeg", 0.85));
+    };
+    img.src = dataUrl;
+  });
+}
+
+async function requestVisionAssets(): Promise<void> {
+  if (!detailItem.value) return;
+  const item = detailItem.value;
+  if (!item.photo_urls.length) {
+    visionError.value = "该巡检记录无照片，无法进行视觉识别。";
+    return;
+  }
+
+  visionLoading.value = true;
+  visionError.value = "";
+  visionAssets.value = [];
+
+  try {
+    const imageDataUrls = await Promise.all(
+      item.photo_urls.slice(0, 2).map(fetchImageAsBase64)
+    );
+
+    const prompt = `请分析这${imageDataUrls.length}张弱电机房巡检照片，识别所有可见设备。
+以JSON数组格式返回，每个设备包含：
+- name: 设备名称（如：服务器、交换机、配线架、UPS、路由器、光纤收发器等）
+- location: 位置描述（如：上层左侧第1台）
+- status: 从照片观察的运行状态（正常/指示灯异常/损坏/缺失/未知）
+- model: 品牌型号（无法识别则为null）
+- row_frac: 设备中心在第一张照片中的垂直比例（0.0=顶部, 1.0=底部）
+- col_frac: 设备中心在第一张照片中的水平比例（0.0=左侧, 1.0=右侧）
+房间：${item.building_code} / ${item.room_code}
+仅返回JSON数组，不要其他文字。`;
+
+    const output = await callAiGateway({
+      mode: aiConfig.value.mode,
+      backendBaseUrl: getBackendBaseUrl(),
+      accessToken: getAccessToken(),
+      endpoint: aiConfig.value.endpoint,
+      apiKey: aiConfig.value.apiKey,
+      model: aiConfig.value.model,
+      systemPrompt: "你是弱电机房设备识别专家，能够从照片中准确识别各类网络、服务器和机房设备。",
+      userPrompt: prompt,
+      temperature: 0.1,
+      images: imageDataUrls,
+    });
+
+    let parsed: VisionAsset[] = [];
+    const match = output.text.match(/\[[\s\S]*\]/);
+    if (match) {
+      try {
+        parsed = JSON.parse(match[0]);
+      } catch {
+        visionError.value = "AI 返回格式无法解析，请重试。";
+        return;
+      }
+    } else {
+      visionError.value = "AI 未返回结构化结果：" + output.text.slice(0, 120);
+      return;
+    }
+
+    const firstImg = imageDataUrls[0];
+    visionAssets.value = await Promise.all(
+      parsed.map(async (asset) => {
+        let thumbnail: string | null = null;
+        if (firstImg && typeof asset.row_frac === "number" && typeof asset.col_frac === "number") {
+          try {
+            thumbnail = await cropImageToDataUrl(firstImg, asset.row_frac, asset.col_frac);
+          } catch { /* ignore crop errors */ }
+        }
+        return { ...asset, thumbnail };
+      })
+    );
+  } catch (e) {
+    visionError.value = e instanceof Error ? e.message : "视觉识别失败";
+  } finally {
+    visionLoading.value = false;
+  }
+}
+
 const showRoomCompareDialog = ref(false);
 const compareRoomCode = ref("");
 const compareInspections = ref<ConsoleInspectionItem[]>([]);
@@ -1025,6 +1151,8 @@ function openInspectionDetail(item: ConsoleInspectionItem): void {
   detailItem.value = item;
   detailAiResult.value = "";
   detailAiError.value = "";
+  visionAssets.value = [];
+  visionError.value = "";
   showInspectionDetailDialog.value = true;
 }
 
@@ -2297,11 +2425,41 @@ onMounted(async () => {
           <img v-for="url in detailItem.photo_urls" :key="url" :src="url" alt="巡检照片" @click="openPhotoPreview(url)" />
         </div>
         <div class="actions">
+          <button :disabled="visionLoading" @click="requestVisionAssets">
+            {{ visionLoading ? "识别中..." : "🔍 AI 视觉识别设备" }}
+          </button>
           <button :disabled="detailAiLoading" @click="requestAiAnalysis">
-            {{ detailAiLoading ? "分析中..." : "🤖 AI 分析建议" }}
+            {{ detailAiLoading ? "分析中..." : "🤖 AI 文字分析" }}
           </button>
           <button class="ghost" @click="showInspectionDetailDialog = false">关闭</button>
         </div>
+        <p class="error" v-if="visionError">{{ visionError }}</p>
+
+        <!-- 视觉识别设备卡片 -->
+        <div v-if="visionAssets.length > 0" class="vision-assets-panel">
+          <h4 class="vision-assets-title">📦 识别到 {{ visionAssets.length }} 件设备</h4>
+          <div class="vision-assets-grid">
+            <div v-for="(asset, idx) in visionAssets" :key="idx" class="vision-asset-card">
+              <img
+                v-if="asset.thumbnail"
+                :src="asset.thumbnail"
+                class="vision-asset-thumb"
+                @click="openPhotoPreview(asset.thumbnail!)"
+              />
+              <div v-else class="vision-asset-thumb-placeholder">📷</div>
+              <div class="vision-asset-info">
+                <span class="vision-asset-name">{{ asset.name }}</span>
+                <span class="vision-asset-location">{{ asset.location }}</span>
+                <span
+                  class="vision-asset-status"
+                  :class="asset.status === '正常' ? 'status-ok' : asset.status === '未知' ? '' : 'status-warn'"
+                >{{ asset.status }}</span>
+                <span v-if="asset.model" class="vision-asset-model">{{ asset.model }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <p class="error" v-if="detailAiError">{{ detailAiError }}</p>
         <pre class="result" v-if="detailAiResult">{{ detailAiResult }}</pre>
       </div>

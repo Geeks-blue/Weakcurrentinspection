@@ -10,6 +10,7 @@
     python start.py --logs       # 实时查看后端日志
     python start.py --status     # 查看各服务状态
 """
+
 import argparse
 import os
 import platform
@@ -44,23 +45,54 @@ def _ansi(code: str, text: str) -> str:
     return f"\033[{code}m{text}\033[0m"
 
 
-def green(t): return _ansi("32", t)
-def yellow(t): return _ansi("33", t)
-def red(t): return _ansi("31", t)
-def cyan(t): return _ansi("36", t)
-def bold(t): return _ansi("1", t)
+def green(t):
+    return _ansi("32", t)
 
 
-def log(msg: str): print(f"[{cyan('启动器')}] {msg}")
-def ok(msg: str):  print(f"[{green('  ✓  ')}] {msg}")
-def warn(msg: str): print(f"[{yellow('  ⚠  ')}] {msg}")
-def err(msg: str): print(f"[{red('  ✗  ')}] {msg}")
-def step(msg: str): print(f"\n{bold('──')} {msg}")
+def yellow(t):
+    return _ansi("33", t)
+
+
+def red(t):
+    return _ansi("31", t)
+
+
+def cyan(t):
+    return _ansi("36", t)
+
+
+def bold(t):
+    return _ansi("1", t)
+
+
+def log(msg: str):
+    print(f"[{cyan('启动器')}] {msg}")
+
+
+def ok(msg: str):
+    print(f"[{green('  ✓  ')}] {msg}")
+
+
+def warn(msg: str):
+    print(f"[{yellow('  ⚠  ')}] {msg}")
+
+
+def err(msg: str):
+    print(f"[{red('  ✗  ')}] {msg}")
+
+
+def step(msg: str):
+    print(f"\n{bold('──')} {msg}")
 
 
 # ─────────────────────── 工具函数 ───────────────────────
-def run_cmd(cmd: list, cwd: Path = ROOT, check: bool = True,
-            capture: bool = False, env: dict = None) -> subprocess.CompletedProcess:
+def run_cmd(
+    cmd: list,
+    cwd: Path = ROOT,
+    check: bool = True,
+    capture: bool = False,
+    env: dict = None,
+) -> subprocess.CompletedProcess:
     kwargs = dict(cwd=str(cwd))
     if capture:
         kwargs["stdout"] = subprocess.PIPE
@@ -84,6 +116,7 @@ def get_cmd_version(cmd: str, args: list = None) -> tuple:
         result = subprocess.run([cmd] + args, capture_output=True, text=True, timeout=5)
         output = (result.stdout + result.stderr).strip()
         import re
+
         m = re.search(r"(\d+)\.(\d+)", output)
         if m:
             return (int(m.group(1)), int(m.group(2)))
@@ -94,8 +127,9 @@ def get_cmd_version(cmd: str, args: list = None) -> tuple:
 
 def wait_for_http(url: str, timeout: int = 30, interval: float = 1.5) -> bool:
     """轮询 HTTP 接口直到返回 200 或超时。"""
-    import urllib.request
     import urllib.error
+    import urllib.request
+
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
@@ -120,7 +154,9 @@ def check_python_version() -> None:
     """检查 Python 版本，低于最低要求时退出。"""
     v = sys.version_info[:2]
     if v < MIN_PYTHON:
-        err(f"Python 版本不足：当前 {v[0]}.{v[1]}，需要 {MIN_PYTHON[0]}.{MIN_PYTHON[1]}+")
+        err(
+            f"Python 版本不足：当前 {v[0]}.{v[1]}，需要 {MIN_PYTHON[0]}.{MIN_PYTHON[1]}+"
+        )
         err("请前往 https://python.org/downloads/ 下载最新版本。")
         sys.exit(1)
     ok(f"Python {v[0]}.{v[1]} ✓")
@@ -142,8 +178,9 @@ def check_docker() -> None:
     ok("Docker ✓")
 
     # 检查 docker compose（v2 插件）
-    result = subprocess.run(["docker", "compose", "version"],
-                            capture_output=True, text=True, timeout=5)
+    result = subprocess.run(
+        ["docker", "compose", "version"], capture_output=True, text=True, timeout=5
+    )
     if result.returncode != 0:
         err("未找到 'docker compose'（需要 Docker Compose V2）。")
         err("请升级 Docker Desktop 至最新版本。")
@@ -156,8 +193,9 @@ def check_docker() -> None:
 
 def _is_dockerhub_reachable() -> bool:
     """用真实 HTTPS 请求检测 Docker Hub 连通性（5 秒超时）。"""
-    import urllib.request
     import urllib.error
+    import urllib.request
+
     try:
         req = urllib.request.Request(
             "https://registry-1.docker.io/v2/",
@@ -192,34 +230,41 @@ def _ensure_docker_mirror() -> None:
         return
 
     if _has_mirror_configured():
-        warn("Docker Hub 仍不可达，但镜像加速已配置。将继续尝试，如失败请检查镜像源是否有效。")
+        warn(
+            "Docker Hub 仍不可达，但镜像加速已配置。将继续尝试，如失败请检查镜像源是否有效。"
+        )
         return
 
     warn("Docker Hub 连接超时（国内网络限制）。")
 
     if platform.system() != "Linux":
         warn("请手动为 Docker 配置镜像加速后重试。")
-        warn("  Windows: Docker Desktop → Settings → Docker Engine → 添加 registry-mirrors")
-        warn("  macOS:   Docker Desktop → Preferences → Docker Engine → 添加 registry-mirrors")
+        warn(
+            "  Windows: Docker Desktop → Settings → Docker Engine → 添加 registry-mirrors"
+        )
+        warn(
+            "  macOS:   Docker Desktop → Preferences → Docker Engine → 添加 registry-mirrors"
+        )
         err("无法继续，Docker Hub 不可达。")
         sys.exit(1)
 
     log("正在为 Docker 配置国内镜像加速（需要 sudo 权限）...")
 
     daemon_json = Path("/etc/docker/daemon.json")
-    mirrors_config = '''{
+    mirrors_config = """{
   "registry-mirrors": [
     "https://docker.mirrors.ustc.edu.cn",
     "https://hub-mirror.c.163.com",
     "https://registry.cn-hangzhou.aliyuncs.com"
   ]
 }
-'''
+"""
     # 备份原有配置
     if daemon_json.exists():
         backup = daemon_json.with_suffix(".json.bak")
-        result = subprocess.run(["sudo", "cp", str(daemon_json), str(backup)],
-                                capture_output=True)
+        result = subprocess.run(
+            ["sudo", "cp", str(daemon_json), str(backup)], capture_output=True
+        )
         if result.returncode == 0:
             log(f"原有配置已备份至 {backup}")
 
@@ -242,8 +287,9 @@ def _ensure_docker_mirror() -> None:
     # 重载并重启 Docker
     log("重启 Docker 服务...")
     subprocess.run(["sudo", "systemctl", "daemon-reload"], check=False)
-    result = subprocess.run(["sudo", "systemctl", "restart", "docker"],
-                            capture_output=True)
+    result = subprocess.run(
+        ["sudo", "systemctl", "restart", "docker"], capture_output=True
+    )
     if result.returncode != 0:
         err("Docker 重启失败，请手动执行：sudo systemctl restart docker")
         sys.exit(1)
@@ -269,7 +315,9 @@ def check_node() -> bool:
         return False
 
     if node_ver < MIN_NODE:
-        warn(f"Node.js 版本较低：{node_ver[0]}.{node_ver[1]}，建议升级至 {MIN_NODE[0]}+")
+        warn(
+            f"Node.js 版本较低：{node_ver[0]}.{node_ver[1]}，建议升级至 {MIN_NODE[0]}+"
+        )
         return False
 
     if npm_ver == (0, 0):
@@ -283,8 +331,9 @@ def check_node() -> bool:
 def check_pip() -> None:
     """确保 pip 可用，必要时尝试升级。"""
     venv_python = get_venv_python()
-    result = subprocess.run([str(venv_python), "-m", "pip", "--version"],
-                            capture_output=True, text=True)
+    result = subprocess.run(
+        [str(venv_python), "-m", "pip", "--version"], capture_output=True, text=True
+    )
     if result.returncode != 0:
         log("pip 不可用，尝试安装...")
         run_cmd([str(venv_python), "-m", "ensurepip", "--upgrade"], cwd=BACKEND_DIR)
@@ -308,6 +357,7 @@ def ensure_env_file() -> None:
     if not env.exists():
         if example.exists():
             import shutil as sh
+
             sh.copy(example, env)
             warn(".env 不存在，已从 .env.example 自动复制。")
             warn(f"请编辑 {env} 修改数据库密码、JWT 密钥等后重新运行。")
@@ -338,7 +388,11 @@ def docker_status() -> None:
 # ─────────────────────── Python 虚拟环境 ───────────────────────
 def get_venv_python() -> Path:
     venv = BACKEND_DIR / ".venv"
-    return venv / ("Scripts" if IS_WINDOWS else "bin") / ("python.exe" if IS_WINDOWS else "python")
+    return (
+        venv
+        / ("Scripts" if IS_WINDOWS else "bin")
+        / ("python.exe" if IS_WINDOWS else "python")
+    )
 
 
 def ensure_venv() -> None:
@@ -347,21 +401,26 @@ def ensure_venv() -> None:
 
     if not venv_python.exists():
         log("创建 Python 虚拟环境（.venv）...")
-        run_cmd([sys.executable, "-m", "venv", str(BACKEND_DIR / ".venv")],
-                cwd=BACKEND_DIR)
+        run_cmd(
+            [sys.executable, "-m", "venv", str(BACKEND_DIR / ".venv")], cwd=BACKEND_DIR
+        )
         ok("虚拟环境创建完成")
     else:
         ok("Python 虚拟环境已存在 ✓")
 
     # 升级 pip 本身
     log("升级 pip...")
-    run_cmd([str(venv_python), "-m", "pip", "install", "--upgrade", "pip", "-q"],
-            cwd=BACKEND_DIR)
+    run_cmd(
+        [str(venv_python), "-m", "pip", "install", "--upgrade", "pip", "-q"],
+        cwd=BACKEND_DIR,
+    )
 
     # 安装 / 更新后端依赖
     log("安装后端依赖（requirements.txt）...")
-    run_cmd([str(venv_python), "-m", "pip", "install", "-r", "requirements.txt", "-q"],
-            cwd=BACKEND_DIR)
+    run_cmd(
+        [str(venv_python), "-m", "pip", "install", "-r", "requirements.txt", "-q"],
+        cwd=BACKEND_DIR,
+    )
     ok("后端 Python 依赖安装完成 ✓")
 
 
@@ -369,7 +428,6 @@ def ensure_venv() -> None:
 def ensure_node_modules(dir_: Path, label: str) -> None:
     """若 node_modules 不存在或 package.json 有变更则重新安装。"""
     nm = dir_ / "node_modules"
-    pkg = dir_ / "package.json"
     lock = dir_ / "package-lock.json"
 
     need_install = not nm.exists()
@@ -391,11 +449,21 @@ def start_backend() -> subprocess.Popen:
     LOG_DIR.mkdir(exist_ok=True)
     venv_python = get_venv_python()
     log("启动后端服务（端口 18000）...")
-    cmd = [str(venv_python), "-m", "uvicorn", "app.main:app",
-           "--host", "0.0.0.0", "--port", "18000", "--reload"]
+    cmd = [
+        str(venv_python),
+        "-m",
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "18000",
+        "--reload",
+    ]
     log_fd = open(LOG_FILE, "a", encoding="utf-8")
-    proc = subprocess.Popen(cmd, cwd=str(BACKEND_DIR),
-                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    proc = subprocess.Popen(
+        cmd, cwd=str(BACKEND_DIR), stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+    )
 
     import threading
 
@@ -450,10 +518,12 @@ def main() -> None:
         description="校园弱电巡检管理系统一键启动脚本",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--backend-only", action="store_true", help="只启动后端，不启动前端开发服务器")
-    parser.add_argument("--stop",     action="store_true", help="停止 Docker 服务")
-    parser.add_argument("--logs",     action="store_true", help="实时查看后端日志")
-    parser.add_argument("--status",   action="store_true", help="查看各服务状态")
+    parser.add_argument(
+        "--backend-only", action="store_true", help="只启动后端，不启动前端开发服务器"
+    )
+    parser.add_argument("--stop", action="store_true", help="停止 Docker 服务")
+    parser.add_argument("--logs", action="store_true", help="实时查看后端日志")
+    parser.add_argument("--status", action="store_true", help="查看各服务状态")
     args = parser.parse_args()
 
     print(bold("\n===== 校园弱电巡检管理系统 =====\n"))
@@ -514,12 +584,12 @@ def main() -> None:
     # ── 汇总信息 ──
     print()
     print(bold("─── 服务运行中 ────────────────────────────────"))
-    print(f"  后端 API     : http://127.0.0.1:18000")
-    print(f"  API 文档     : http://127.0.0.1:18000/docs")
+    print("  后端 API     : http://127.0.0.1:18000")
+    print("  API 文档     : http://127.0.0.1:18000/docs")
     print(f"  运行日志     : {LOG_FILE}")
     if not args.backend_only and node_ok:
-        print(f"  管理端       : http://localhost:5173")
-        print(f"  移动端       : http://localhost:5174")
+        print("  管理端       : http://localhost:5173")
+        print("  移动端       : http://localhost:5174")
     print(bold("────────────────────────────────────────────────"))
     print(yellow("按 Ctrl+C 停止后端（Docker 服务继续运行）"))
     print()

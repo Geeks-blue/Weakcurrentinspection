@@ -715,6 +715,89 @@ button.danger {
   flex-shrink: 0;
 }
 
+.vision-assets-panel {
+  margin-top: 16px;
+}
+
+.vision-assets-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #2c4a8a;
+  margin: 0 0 10px;
+}
+
+.vision-assets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.vision-asset-card {
+  background: #f6f9ff;
+  border: 1px solid #d7e3f7;
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.vision-asset-thumb {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  background: #e8f0fb;
+  cursor: zoom-in;
+}
+
+.vision-asset-thumb-placeholder {
+  width: 100%;
+  height: 120px;
+  background: #eef3fb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  color: #b0c4e0;
+}
+
+.vision-asset-info {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.vision-asset-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e3a7a;
+}
+
+.vision-asset-location {
+  font-size: 11px;
+  color: #6a7ea8;
+}
+
+.vision-asset-status {
+  font-size: 11px;
+  font-weight: 600;
+  color: #5a8a5a;
+}
+
+.vision-asset-status.status-ok {
+  color: #3a7a3a;
+}
+
+.vision-asset-status.status-warn {
+  color: #c05010;
+}
+
+.vision-asset-model {
+  font-size: 11px;
+  color: #7a90b8;
+  font-style: italic;
+}
+
 .result {
   margin-top: 12px;
   background: #f8fbff;

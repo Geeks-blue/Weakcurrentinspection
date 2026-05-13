@@ -3,9 +3,8 @@ import time
 import uuid
 
 import httpx
-from fastapi import APIRouter, HTTPException, Query
-
 from app.core.config import settings
+from fastapi import APIRouter, HTTPException, Query
 
 router = APIRouter()
 
@@ -18,11 +17,17 @@ async def _get_access_token() -> str:
     if _token_cache["token"] and now < _token_cache["expires_at"]:
         return _token_cache["token"]
     if not settings.wechat_appid or not settings.wechat_appsecret:
-        raise HTTPException(status_code=503, detail="WeChat AppID/AppSecret not configured")
+        raise HTTPException(
+            status_code=503, detail="WeChat AppID/AppSecret not configured"
+        )
     async with httpx.AsyncClient(timeout=10) as client:
         resp = await client.get(
             "https://api.weixin.qq.com/cgi-bin/token",
-            params={"grant_type": "client_credential", "appid": settings.wechat_appid, "secret": settings.wechat_appsecret},
+            params={
+                "grant_type": "client_credential",
+                "appid": settings.wechat_appid,
+                "secret": settings.wechat_appsecret,
+            },
         )
         data = resp.json()
     if "access_token" not in data:
@@ -51,11 +56,15 @@ async def _get_jsapi_ticket() -> str:
 
 
 @router.get("/jssdk-config")
-async def jssdk_config(url: str = Query(..., description="当前页面完整 URL（不含 # 部分）")):
+async def jssdk_config(
+    url: str = Query(..., description="当前页面完整 URL（不含 # 部分）"),
+):
     ticket = await _get_jsapi_ticket()
     noncestr = uuid.uuid4().hex
     timestamp = int(time.time())
-    sign_str = f"jsapi_ticket={ticket}&noncestr={noncestr}&timestamp={timestamp}&url={url}"
+    sign_str = (
+        f"jsapi_ticket={ticket}&noncestr={noncestr}&timestamp={timestamp}&url={url}"
+    )
     signature = hashlib.sha1(sign_str.encode("utf-8")).hexdigest()
     return {
         "appId": settings.wechat_appid,

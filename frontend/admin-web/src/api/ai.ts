@@ -9,6 +9,7 @@ export interface AiRequestInput {
   systemPrompt: string;
   userPrompt: string;
   temperature: number;
+  images?: string[];
 }
 
 export interface AiResponseOutput {
@@ -47,12 +48,19 @@ async function callDirect(input: AiRequestInput): Promise<AiResponseOutput> {
     throw new Error("请填写 AI 接口地址。");
   }
 
+  const userContent = input.images?.length
+    ? [
+        { type: "text", text: input.userPrompt },
+        ...input.images.map(img => ({ type: "image_url", image_url: { url: img } }))
+      ]
+    : input.userPrompt;
+
   const body = {
     model: input.model,
     temperature: input.temperature,
     messages: [
       ...(input.systemPrompt ? [{ role: "system", content: input.systemPrompt }] : []),
-      { role: "user", content: input.userPrompt }
+      { role: "user", content: userContent }
     ]
   };
 
@@ -94,7 +102,8 @@ async function callByBackendProxy(input: AiRequestInput): Promise<AiResponseOutp
       model: input.model,
       system_prompt: input.systemPrompt,
       user_prompt: input.userPrompt,
-      temperature: input.temperature
+      temperature: input.temperature,
+      images: input.images ?? []
     })
   });
 

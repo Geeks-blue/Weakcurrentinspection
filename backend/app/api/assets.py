@@ -510,13 +510,51 @@ def delete_asset_photo(
         db.commit()
 
 
+@router.get("/template/rooms")
+def download_rooms_template() -> Response:
+    from openpyxl import Workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "房间导入模板"
+    ws.append(["序号", "楼名", "楼层", "弱电间位置", "编号", "备注"])
+    ws.append([1, "教学楼", "一楼", "南", "BFRJR-RDJ-001", ""])
+    ws.append([2, "教学楼", "二楼", "北", "BFRJR-RDJ-002", ""])
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return Response(
+        content=buf.read(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=rooms_template.xlsx"},
+    )
+
+
+def _normalize_row_for_rooms(row: dict[str, str]) -> dict[str, str]:
+    out = dict(row)
+    cn_map = {
+        "楼名": "building_name",
+        "楼层": "floor_label",
+        "弱电间位置": "location_text",
+        "编号": "room_code",
+        "备注": "note",
+    }
+    for cn, en in cn_map.items():
+        if cn in out and en not in out:
+            out[en] = out[cn]
+    if "building_code" not in out:
+        name = out.get("building_name", "").strip()
+        if name:
+            out["building_code"] = name
+    return out
+
+
 @router.post("/import/rooms", response_model=ImportSummary)
 def import_rooms(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     _: User = Depends(require_teacher_or_admin),
 ) -> ImportSummary:
-    rows = _parse_table_file(file)
+    rows = [_normalize_row_for_rooms(r) for r in _parse_table_file(file)]
     created_count = 0
     updated_count = 0
     skipped_count = 0
@@ -527,7 +565,7 @@ def import_rooms(
         room_code = row.get("room_code", "").strip()
         if not building_code or not room_code:
             skipped_count += 1
-            errors.append(f"第{index}行缺少 building_code 或 room_code")
+            errors.append(f"第{index}行缺少楼名/编号")
             continue
 
         building = db.query(Building).filter(Building.code == building_code).first()

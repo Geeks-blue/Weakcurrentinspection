@@ -2096,6 +2096,7 @@ onMounted(async () => {
             <button @click="openRoomDialog()">新增房间</button>
             <button @click="openAssetDialog()">新增资产</button>
             <button class="ghost" :disabled="importingRooms" @click="triggerRoomsImport">{{ importingRooms ? "导入中..." : "导入房间表" }}</button>
+            <a class="ghost btn-link" :href="`${getBackendBaseUrl()}/assets/template/rooms`" download="rooms_template.xlsx">下载房间模板</a>
             <button class="ghost" :disabled="importingAssets" @click="triggerAssetsImport">{{ importingAssets ? "导入中..." : "导入资产表" }}</button>
           </div>
           <p class="hint" v-if="assetMessage">{{ assetMessage }}</p>

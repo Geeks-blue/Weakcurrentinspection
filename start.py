@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """
-校园弱电巡检管理系统 — 一键启动脚本
-支持 Windows / macOS / Linux，自动检查并安装缺失依赖。
+校园弱电巡检与资产管理系统一键启动/部署脚本。
 
-用法：
-    python start.py              # 启动基础服务 + 后端（不含前端）
-    python start.py --backend-only  # 只启动后端（跳过前端）
-    python start.py --stop       # 停止 Docker 服务
-    python start.py --logs       # 实时查看后端日志
-    python start.py --status     # 查看各服务状态
+常用命令：
+  python start.py                 开发模式：启动 Docker 基础服务、后端、两个前端 dev server
+  python start.py --backend-only  只启动 Docker 基础服务和后端
+  python start.py --prod          生产模式：构建前端、启动 HTTPS Nginx、启动后端
+  python start.py --build-frontends
+  python start.py --status
+  python start.py --logs
+  python start.py --stop
 """
+
+from __future__ import annotations
 
 import argparse
 import os
@@ -20,9 +23,10 @@ import socket
 import subprocess
 import sys
 import time
+import urllib.request
 from pathlib import Path
 
-# ─────────────────────── 目录配置 ───────────────────────
+
 ROOT = Path(__file__).resolve().parent
 BACKEND_DIR = ROOT / "backend"
 ADMIN_DIR = ROOT / "frontend" / "admin-web"
@@ -30,590 +34,599 @@ MOBILE_DIR = ROOT / "frontend" / "mobile-web"
 LOG_DIR = ROOT / "logs"
 LOG_FILE = LOG_DIR / "app.log"
 
-# Python 最低版本要求
-MIN_PYTHON = (3, 8)
-# Node.js 最低版本要求
+MIN_PYTHON = (3, 10)
 MIN_NODE = (16, 0)
+BACKEND_PORT = 18000
+ADMIN_PORT = 5173
+MOBILE_PORT = 5174
 
-# ─────────────────────── 颜色输出（跨平台） ───────────────────────
 IS_WINDOWS = platform.system() == "Windows"
 
 
 def _ansi(code: str, text: str) -> str:
-    if IS_WINDOWS and "TERM" not in os.environ:
+    if IS_WINDOWS and "WT_SESSION" not in os.environ and "TERM" not in os.environ:
         return text
     return f"\033[{code}m{text}\033[0m"
 
 
-def green(t):
-    return _ansi("32", t)
+def bold(text: str) -> str:
+    return _ansi("1", text)
 
 
-def yellow(t):
-    return _ansi("33", t)
+def green(text: str) -> str:
+    return _ansi("32", text)
 
 
-def red(t):
-    return _ansi("31", t)
+def yellow(text: str) -> str:
+    return _ansi("33", text)
 
 
-def cyan(t):
-    return _ansi("36", t)
+def red(text: str) -> str:
+    return _ansi("31", text)
 
 
-def bold(t):
-    return _ansi("1", t)
+def cyan(text: str) -> str:
+    return _ansi("36", text)
 
 
-def log(msg: str):
-    print(f"[{cyan('启动器')}] {msg}")
+def log(message: str) -> None:
+    print(f"[{cyan('启动器')}] {message}")
 
 
-def ok(msg: str):
-    print(f"[{green('  ✓  ')}] {msg}")
+def ok(message: str) -> None:
+    print(f"[{green('OK')}] {message}")
 
 
-def warn(msg: str):
-    print(f"[{yellow('  ⚠  ')}] {msg}")
+def warn(message: str) -> None:
+    print(f"[{yellow('WARN')}] {message}")
 
 
-def err(msg: str):
-    print(f"[{red('  ✗  ')}] {msg}")
+def fail(message: str, code: int = 1) -> None:
+    print(f"[{red('ERR')}] {message}")
+    raise SystemExit(code)
 
 
-def step(msg: str):
-    print(f"\n{bold('──')} {msg}")
+def step(title: str) -> None:
+    print()
+    print(bold(f"== {title} =="))
 
 
-# ─────────────────────── 工具函数 ───────────────────────
+def command_name(*candidates: str) -> str | None:
+    for candidate in candidates:
+        if shutil.which(candidate):
+            return candidate
+    return None
+
+
 def run_cmd(
-    cmd: list,
+    cmd: list[str],
     cwd: Path = ROOT,
     check: bool = True,
     capture: bool = False,
-    env: dict = None,
-) -> subprocess.CompletedProcess:
-    kwargs = dict(cwd=str(cwd))
+    env: dict[str, str] | None = None,
+    timeout: int | None = None,
+) -> subprocess.CompletedProcess[str]:
+    kwargs: dict = {
+        "cwd": str(cwd),
+        "text": True,
+        "env": {**os.environ, **(env or {})},
+    }
     if capture:
         kwargs["stdout"] = subprocess.PIPE
         kwargs["stderr"] = subprocess.PIPE
-        kwargs["text"] = True
-    if env:
-        kwargs["env"] = {**os.environ, **env}
-    result = subprocess.run(cmd, **kwargs)
+
+    result = subprocess.run(cmd, timeout=timeout, **kwargs)
     if check and result.returncode != 0:
-        err(f"命令失败：{' '.join(str(c) for c in cmd)}")
-        sys.exit(1)
+        fail(f"命令执行失败：{' '.join(cmd)}")
     return result
 
 
-def get_cmd_version(cmd: str, args: list = None) -> tuple:
-    """获取命令版本号，返回 (major, minor) 元组；不存在返回 (0, 0)。"""
+def get_version(cmd: str, args: list[str] | None = None) -> tuple[int, int]:
     if not shutil.which(cmd):
         return (0, 0)
     try:
-        args = args or ["--version"]
-        result = subprocess.run([cmd] + args, capture_output=True, text=True, timeout=5)
-        output = (result.stdout + result.stderr).strip()
+        result = run_cmd([cmd] + (args or ["--version"]), check=False, capture=True, timeout=8)
+        output = f"{result.stdout or ''}\n{result.stderr or ''}"
         import re
 
-        m = re.search(r"(\d+)\.(\d+)", output)
-        if m:
-            return (int(m.group(1)), int(m.group(2)))
+        match = re.search(r"(\d+)\.(\d+)", output)
+        if match:
+            return int(match.group(1)), int(match.group(2))
     except Exception:
         pass
     return (1, 0)
 
 
-def wait_for_http(url: str, timeout: int = 30, interval: float = 1.5) -> bool:
-    """轮询 HTTP 接口直到返回 200 或超时。"""
-    import urllib.error
-    import urllib.request
-
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        try:
-            with urllib.request.urlopen(url, timeout=2) as resp:
-                if resp.status == 200:
-                    return True
-        except Exception:
-            pass
-        time.sleep(interval)
-    return False
+def load_env_file() -> dict[str, str]:
+    env_path = ROOT / ".env"
+    values: dict[str, str] = {}
+    if not env_path.exists():
+        return values
+    for line in env_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        values[key.strip()] = value.strip().strip('"').strip("'")
+    return values
 
 
 def is_port_free(port: int) -> bool:
-    """检查端口是否空闲。"""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.settimeout(1)
-        return s.connect_ex(("127.0.0.1", port)) != 0
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(1)
+        return sock.connect_ex(("127.0.0.1", port)) != 0
 
 
-# ─────────────────────── 依赖检查 ───────────────────────
+def wait_tcp(host: str, port: int, timeout: int = 45) -> bool:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(2)
+            if sock.connect_ex((host, port)) == 0:
+                return True
+        time.sleep(1)
+    return False
+
+
+def wait_http(url: str, timeout: int = 45) -> bool:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            with urllib.request.urlopen(url, timeout=3) as response:
+                if 200 <= response.status < 300:
+                    return True
+        except Exception:
+            pass
+        time.sleep(1.5)
+    return False
+
+
 def check_python_version() -> None:
-    """检查 Python 版本，低于最低要求时退出。"""
-    v = sys.version_info[:2]
-    if v < MIN_PYTHON:
-        err(
-            f"Python 版本不足：当前 {v[0]}.{v[1]}，需要 {MIN_PYTHON[0]}.{MIN_PYTHON[1]}+"
-        )
-        err("请前往 https://python.org/downloads/ 下载最新版本。")
-        sys.exit(1)
-    ok(f"Python {v[0]}.{v[1]} ✓")
+    version = sys.version_info[:2]
+    if version < MIN_PYTHON:
+        fail(f"Python 版本过低：当前 {version[0]}.{version[1]}，需要 {MIN_PYTHON[0]}.{MIN_PYTHON[1]}+")
+    ok(f"Python {version[0]}.{version[1]}")
+
+
+def docker_compose_cmd() -> list[str]:
+    docker = command_name("docker")
+    if not docker:
+        fail("未找到 Docker。请先安装并启动 Docker Desktop。")
+    result = run_cmd([docker, "compose", "version"], check=False, capture=True, timeout=10)
+    if result.returncode == 0:
+        return [docker, "compose"]
+
+    docker_compose = command_name("docker-compose")
+    if docker_compose:
+        warn("未检测到 Docker Compose V2，已使用 docker-compose v1 兼容模式。")
+        return [docker_compose]
+
+    fail("未找到 Docker Compose。请安装 Docker Compose V2，或在 Linux 上安装 docker-compose。")
 
 
 def check_docker() -> None:
-    """检查 Docker 及 Docker Compose 是否安装并运行；在国内环境自动配置镜像加速。"""
-    if not shutil.which("docker"):
-        err("未找到 docker 命令。")
-        err("请安装 Docker Desktop：https://docs.docker.com/get-docker/")
-        sys.exit(1)
-
-    # 检查 Docker 守护进程是否运行
-    result = subprocess.run(["docker", "info"], capture_output=True, timeout=5)
+    docker = command_name("docker")
+    if not docker:
+        fail("未找到 Docker。请先安装 Docker Desktop。")
+    result = run_cmd([docker, "info"], check=False, capture=True, timeout=15)
     if result.returncode != 0:
-        err("Docker 守护进程未运行，请先启动 Docker Desktop 再执行本脚本。")
-        sys.exit(1)
-
-    ok("Docker ✓")
-
-    # 检查 docker compose（v2 插件）
-    result = subprocess.run(
-        ["docker", "compose", "version"], capture_output=True, text=True, timeout=5
-    )
-    if result.returncode != 0:
-        err("未找到 'docker compose'（需要 Docker Compose V2）。")
-        err("请升级 Docker Desktop 至最新版本。")
-        sys.exit(1)
-    ok("Docker Compose V2 ✓")
-
-    # 检测 Docker Hub 连通性，国内环境自动配置镜像加速
-    _ensure_docker_mirror()
+        fail("Docker 守护进程未运行，请先启动 Docker Desktop。")
+    docker_compose_cmd()
+    ok("Docker / Docker Compose")
 
 
-def _is_dockerhub_reachable() -> bool:
-    """用真实 HTTPS 请求检测 Docker Hub 连通性（5 秒超时）。"""
-    import urllib.error
-    import urllib.request
-
-    try:
-        req = urllib.request.Request(
-            "https://registry-1.docker.io/v2/",
-            headers={"User-Agent": "docker/20.10"},
-        )
-        with urllib.request.urlopen(req, timeout=5):
-            pass
-        return True
-    except Exception:
-        return False
-
-
-def _has_mirror_configured() -> bool:
-    """检查是否已配置了镜像加速。"""
-    daemon_json = Path("/etc/docker/daemon.json")
-    if not daemon_json.exists():
-        return False
-    try:
-        content = daemon_json.read_text()
-        return "registry-mirrors" in content
-    except Exception:
-        return False
-
-
-def _ensure_docker_mirror() -> None:
-    """
-    若 Docker Hub 不可达（常见于国内服务器），自动写入镜像加速配置并重启 Docker。
-    仅在 Linux 且具有 sudo 权限时生效；Windows/macOS 用户需手动配置。
-    """
-    if _is_dockerhub_reachable():
-        ok("Docker Hub 连通 ✓")
+def ensure_linux_executable_hint() -> None:
+    if IS_WINDOWS:
         return
-
-    if _has_mirror_configured():
-        warn(
-            "Docker Hub 仍不可达，但镜像加速已配置。将继续尝试，如失败请检查镜像源是否有效。"
-        )
-        return
-
-    warn("Docker Hub 连接超时（国内网络限制）。")
-
-    if platform.system() != "Linux":
-        warn("请手动为 Docker 配置镜像加速后重试。")
-        warn(
-            "  Windows: Docker Desktop → Settings → Docker Engine → 添加 registry-mirrors"
-        )
-        warn(
-            "  macOS:   Docker Desktop → Preferences → Docker Engine → 添加 registry-mirrors"
-        )
-        err("无法继续，Docker Hub 不可达。")
-        sys.exit(1)
-
-    log("正在为 Docker 配置国内镜像加速（需要 sudo 权限）...")
-
-    daemon_json = Path("/etc/docker/daemon.json")
-    mirrors_config = """{
-  "registry-mirrors": [
-    "https://docker.mirrors.ustc.edu.cn",
-    "https://hub-mirror.c.163.com",
-    "https://registry.cn-hangzhou.aliyuncs.com"
-  ]
-}
-"""
-    # 备份原有配置
-    if daemon_json.exists():
-        backup = daemon_json.with_suffix(".json.bak")
-        result = subprocess.run(
-            ["sudo", "cp", str(daemon_json), str(backup)], capture_output=True
-        )
-        if result.returncode == 0:
-            log(f"原有配置已备份至 {backup}")
-
-    # 写入新配置
-    write_result = subprocess.run(
-        ["sudo", "tee", str(daemon_json)],
-        input=mirrors_config.encode(),
-        capture_output=True,
-    )
-    if write_result.returncode != 0:
-        err("写入 /etc/docker/daemon.json 失败，请手动配置镜像加速：")
-        err("  sudo tee /etc/docker/daemon.json << 'EOF'")
-        err(mirrors_config)
-        err("  EOF")
-        err("  sudo systemctl restart docker")
-        sys.exit(1)
-
-    ok("镜像加速配置已写入 /etc/docker/daemon.json")
-
-    # 重载并重启 Docker
-    log("重启 Docker 服务...")
-    subprocess.run(["sudo", "systemctl", "daemon-reload"], check=False)
-    result = subprocess.run(
-        ["sudo", "systemctl", "restart", "docker"], capture_output=True
-    )
-    if result.returncode != 0:
-        err("Docker 重启失败，请手动执行：sudo systemctl restart docker")
-        sys.exit(1)
-
-    time.sleep(2)
-
-    # 再次检测
-    if _is_dockerhub_reachable():
-        ok("Docker Hub 连通（镜像加速生效）✓")
-    else:
-        warn("配置镜像加速后仍无法连通，可能需要等待几秒后重试。")
-        warn("继续尝试拉取镜像，若失败请手动拉取或更换镜像源。")
+    try:
+        mode = ROOT.joinpath("start.py").stat().st_mode
+        if mode & 0o111:
+            return
+        warn("start.py 当前没有可执行位；Linux 下如需 ./start.py 启动，请执行：chmod +x start.py")
+    except OSError:
+        pass
 
 
-def check_node() -> bool:
-    """检查 Node.js 和 npm 版本，返回是否可用。"""
-    node_ver = get_cmd_version("node")
-    npm_ver = get_cmd_version("npm")
+def npm_cmd() -> str | None:
+    if IS_WINDOWS:
+        return command_name("npm.cmd", "npm")
+    return command_name("npm")
 
-    if node_ver == (0, 0):
-        warn("未找到 Node.js — 前端开发服务器无法启动。")
-        warn("如需启动前端，请安装 Node.js 16+：https://nodejs.org/")
+
+def check_node(required: bool) -> bool:
+    node = command_name("node")
+    npm = npm_cmd()
+    if not node or not npm:
+        message = "未找到 Node.js/npm，无法安装或启动前端。"
+        if required:
+            fail(message)
+        warn(message)
         return False
 
-    if node_ver < MIN_NODE:
-        warn(
-            f"Node.js 版本较低：{node_ver[0]}.{node_ver[1]}，建议升级至 {MIN_NODE[0]}+"
-        )
+    node_version = get_version(node)
+    if node_version < MIN_NODE:
+        message = f"Node.js 版本过低：当前 {node_version[0]}.{node_version[1]}，建议 {MIN_NODE[0]}+。"
+        if required:
+            fail(message)
+        warn(message)
         return False
 
-    if npm_ver == (0, 0):
-        warn("未找到 npm — 前端依赖无法安装。")
-        return False
-
-    ok(f"Node.js {node_ver[0]}.{node_ver[1]} / npm {npm_ver[0]}.{npm_ver[1]} ✓")
+    npm_version = get_version(npm)
+    ok(f"Node.js {node_version[0]}.{node_version[1]} / npm {npm_version[0]}.{npm_version[1]}")
     return True
 
 
-def check_pip() -> None:
-    """确保 pip 可用，必要时尝试升级。"""
-    venv_python = get_venv_python()
-    result = subprocess.run(
-        [str(venv_python), "-m", "pip", "--version"], capture_output=True, text=True
-    )
+def ensure_env_file(prod: bool) -> None:
+    env_path = ROOT / ".env"
+    example_path = ROOT / ".env.example"
+    if not env_path.exists():
+        if not example_path.exists():
+            fail("缺少 .env 和 .env.example，无法启动。")
+        shutil.copyfile(example_path, env_path)
+        warn("已从 .env.example 创建 .env。")
+        if prod:
+            fail("生产部署前请先修改 .env 中的数据库密码、JWT 密钥和域名配置。")
+
+    values = load_env_file()
+    if prod:
+        insecure = []
+        if values.get("JWT_SECRET_KEY") in {"", "change-me-in-production", "change-me"}:
+            insecure.append("JWT_SECRET_KEY")
+        if values.get("POSTGRES_PASSWORD") in {"", "wc_pass_please_change"}:
+            insecure.append("POSTGRES_PASSWORD")
+        if values.get("MINIO_ROOT_PASSWORD") in {"", "minioadmin_change"}:
+            insecure.append("MINIO_ROOT_PASSWORD")
+        if insecure:
+            fail(f"生产部署前必须修改这些默认配置：{', '.join(insecure)}")
+    ok(".env")
+
+
+def warn_if_ports_busy(include_frontend: bool) -> None:
+    ports = [(BACKEND_PORT, "后端 API")]
+    if include_frontend:
+        ports += [(ADMIN_PORT, "管理端前端"), (MOBILE_PORT, "移动端前端")]
+    for port, label in ports:
+        if is_port_free(port):
+            ok(f"端口 {port}（{label}）可用")
+        else:
+            warn(f"端口 {port}（{label}）已被占用。如果是旧服务在运行，可以忽略。")
+
+
+def venv_python() -> Path:
+    return BACKEND_DIR / ".venv" / ("Scripts" if IS_WINDOWS else "bin") / ("python.exe" if IS_WINDOWS else "python")
+
+
+def venv_is_healthy() -> bool:
+    python = venv_python()
+    if not python.exists():
+        return False
+    result = run_cmd([str(python), "--version"], check=False, capture=True, timeout=10)
     if result.returncode != 0:
-        log("pip 不可用，尝试安装...")
-        run_cmd([str(venv_python), "-m", "ensurepip", "--upgrade"], cwd=BACKEND_DIR)
-    ok("pip ✓")
+        return False
+    result = run_cmd([str(python), "-m", "pip", "--version"], check=False, capture=True, timeout=10)
+    return result.returncode == 0
 
 
-def check_ports() -> None:
-    """检查关键端口是否被占用。"""
-    ports = {18000: "后端 API", 5173: "管理端前端", 5174: "移动端前端"}
-    for port, label in ports.items():
-        if not is_port_free(port):
-            warn(f"端口 {port}（{label}）已被占用，请确认是否已有服务运行。")
+def remove_broken_venv() -> None:
+    venv_dir = BACKEND_DIR / ".venv"
+    if not venv_dir.exists():
+        return
+    resolved = venv_dir.resolve()
+    if ROOT.resolve() not in resolved.parents:
+        fail(f"拒绝删除工作区外的虚拟环境：{resolved}")
+    warn("检测到 backend/.venv 不可用，正在重建。")
+    shutil.rmtree(venv_dir)
+
+
+def ensure_venv(skip_install: bool) -> None:
+    if not venv_is_healthy():
+        remove_broken_venv()
+        log("创建 Python 虚拟环境：backend/.venv")
+        run_cmd([sys.executable, "-m", "venv", str(BACKEND_DIR / ".venv")], cwd=ROOT)
+
+    python = venv_python()
+    ok("Python 虚拟环境")
+    if skip_install:
+        warn("已跳过 Python 依赖安装。")
+        return
+
+    log("安装/更新后端依赖。")
+    run_cmd([str(python), "-m", "pip", "install", "--upgrade", "pip"], cwd=BACKEND_DIR)
+    run_cmd([str(python), "-m", "pip", "install", "-r", "requirements.txt"], cwd=BACKEND_DIR)
+    ok("后端依赖")
+
+
+def node_modules_need_install(app_dir: Path) -> bool:
+    node_modules = app_dir / "node_modules"
+    package_json = app_dir / "package.json"
+    package_lock = app_dir / "package-lock.json"
+    if not node_modules.exists():
+        return True
+    newest_manifest = max(
+        p.stat().st_mtime for p in (package_json, package_lock) if p.exists()
+    )
+    return newest_manifest > node_modules.stat().st_mtime
+
+
+def ensure_node_modules(app_dir: Path, label: str, skip_install: bool) -> None:
+    npm = npm_cmd()
+    if not npm:
+        fail("未找到 npm。")
+    if skip_install:
+        warn(f"已跳过 {label} 前端依赖安装。")
+        return
+    if node_modules_need_install(app_dir):
+        log(f"安装 {label} 依赖。")
+        run_cmd([npm, "install"], cwd=app_dir)
+    ok(f"{label} node_modules")
+
+
+def build_frontend(app_dir: Path, label: str, skip_install: bool) -> None:
+    npm = npm_cmd()
+    if not npm:
+        fail("未找到 npm。")
+    ensure_node_modules(app_dir, label, skip_install)
+    log(f"构建 {label}。")
+    run_cmd([npm, "run", "build"], cwd=app_dir)
+    ok(f"{label} 构建完成")
+
+
+def compose_up(services: list[str], profile: str | None = None) -> None:
+    cmd = docker_compose_cmd()
+    full_cmd = cmd[:]
+    if profile and cmd[-1] == "compose":
+        full_cmd += ["--profile", profile]
+    full_cmd += ["up", "-d"] + services
+    run_cmd(full_cmd, cwd=ROOT)
+
+
+def ensure_ssl_files() -> None:
+    cert = ROOT / "nginx" / "ssl" / "server.crt"
+    key = ROOT / "nginx" / "ssl" / "server.key"
+    if cert.exists() and key.exists():
+        ok("Nginx SSL 证书")
+        return
+    fail(
+        "生产模式需要 nginx/ssl/server.crt 和 nginx/ssl/server.key。"
+        " 可先按 docs/https-setup.md 生成证书，或去掉 --prod 使用开发模式。"
+    )
+
+
+def start_docker_services(include_nginx: bool) -> None:
+    services = ["postgres", "redis", "minio"]
+    log("启动 Docker 基础服务：PostgreSQL / Redis / MinIO")
+    compose_up(services)
+    if include_nginx:
+        ensure_ssl_files()
+        log("启动 HTTPS Nginx（需要 nginx/ssl/server.crt 和 server.key）。")
+        compose_up(["nginx"], profile="https")
+
+    waits = [(5432, "PostgreSQL"), (6379, "Redis"), (9000, "MinIO")]
+    if include_nginx:
+        waits += [(443, "Nginx HTTPS")]
+    for port, label in waits:
+        if wait_tcp("127.0.0.1", port, timeout=45):
+            ok(f"{label} 已就绪")
         else:
-            ok(f"端口 {port}（{label}）可用 ✓")
-
-
-# ─────────────────────── 环境文件 ───────────────────────
-def ensure_env_file() -> None:
-    env = ROOT / ".env"
-    example = ROOT / ".env.example"
-    if not env.exists():
-        if example.exists():
-            import shutil as sh
-
-            sh.copy(example, env)
-            warn(".env 不存在，已从 .env.example 自动复制。")
-            warn(f"请编辑 {env} 修改数据库密码、JWT 密钥等后重新运行。")
-            sys.exit(0)
-        else:
-            err(".env 和 .env.example 均不存在，请手动创建 .env 文件。")
-            sys.exit(1)
-    ok(".env 文件 ✓")
-
-
-# ─────────────────────── Docker 服务 ───────────────────────
-def start_docker() -> None:
-    log("启动 Docker 基础服务（PostgreSQL / Redis / MinIO）...")
-    run_cmd(["docker", "compose", "up", "-d"], cwd=ROOT)
-    ok("Docker 服务已启动")
+            warn(f"{label} 端口 {port} 未在预期时间内响应，请用 python start.py --status 查看。")
 
 
 def stop_docker() -> None:
-    log("停止 Docker 服务...")
-    run_cmd(["docker", "compose", "down"], cwd=ROOT)
+    log("停止 Docker Compose 服务。")
+    run_cmd(docker_compose_cmd() + ["down"], cwd=ROOT)
     ok("Docker 服务已停止")
 
 
 def docker_status() -> None:
-    run_cmd(["docker", "compose", "ps"], cwd=ROOT, check=False)
+    run_cmd(docker_compose_cmd() + ["ps"], cwd=ROOT, check=False)
 
 
-# ─────────────────────── Python 虚拟环境 ───────────────────────
-def get_venv_python() -> Path:
-    venv = BACKEND_DIR / ".venv"
-    return (
-        venv
-        / ("Scripts" if IS_WINDOWS else "bin")
-        / ("python.exe" if IS_WINDOWS else "python")
-    )
-
-
-def ensure_venv() -> None:
-    """创建虚拟环境（如不存在）并安装/更新全部 Python 依赖。"""
-    venv_python = get_venv_python()
-
-    if not venv_python.exists():
-        log("创建 Python 虚拟环境（.venv）...")
-        run_cmd(
-            [sys.executable, "-m", "venv", str(BACKEND_DIR / ".venv")], cwd=BACKEND_DIR
-        )
-        ok("虚拟环境创建完成")
-    else:
-        ok("Python 虚拟环境已存在 ✓")
-
-    # 升级 pip 本身
-    log("升级 pip...")
-    run_cmd(
-        [str(venv_python), "-m", "pip", "install", "--upgrade", "pip", "-q"],
-        cwd=BACKEND_DIR,
-    )
-
-    # 安装 / 更新后端依赖
-    log("安装后端依赖（requirements.txt）...")
-    run_cmd(
-        [str(venv_python), "-m", "pip", "install", "-r", "requirements.txt", "-q"],
-        cwd=BACKEND_DIR,
-    )
-    ok("后端 Python 依赖安装完成 ✓")
-
-
-# ─────────────────────── 前端依赖 ───────────────────────
-def ensure_node_modules(dir_: Path, label: str) -> None:
-    """若 node_modules 不存在或 package.json 有变更则重新安装。"""
-    nm = dir_ / "node_modules"
-    lock = dir_ / "package-lock.json"
-
-    need_install = not nm.exists()
-    if not need_install and lock.exists():
-        # 若 lock 文件比 node_modules 新，说明依赖有更新
-        if lock.stat().st_mtime > nm.stat().st_mtime:
-            need_install = True
-
-    if need_install:
-        log(f"安装{label}依赖（npm install）...")
-        run_cmd(["npm", "install"], cwd=dir_)
-        ok(f"{label}依赖安装完成 ✓")
-    else:
-        ok(f"{label} node_modules 已存在 ✓")
-
-
-# ─────────────────────── 后端启动 ───────────────────────
-def start_backend() -> subprocess.Popen:
+def start_backend(prod: bool) -> subprocess.Popen:
     LOG_DIR.mkdir(exist_ok=True)
-    venv_python = get_venv_python()
-    log("启动后端服务（端口 18000）...")
+    python = venv_python()
     cmd = [
-        str(venv_python),
+        str(python),
         "-m",
         "uvicorn",
         "app.main:app",
         "--host",
         "0.0.0.0",
         "--port",
-        "18000",
-        "--reload",
+        str(BACKEND_PORT),
     ]
-    log_fd = open(LOG_FILE, "a", encoding="utf-8")
-    proc = subprocess.Popen(
-        cmd, cwd=str(BACKEND_DIR), stdout=subprocess.PIPE, stderr=subprocess.STDOUT
-    )
+    if not prod:
+        cmd.append("--reload")
+
+    mode = "生产模式" if prod else "开发模式"
+    log(f"启动后端服务（{mode}，端口 {BACKEND_PORT}）。")
+    log_file = open(LOG_FILE, "a", encoding="utf-8")
+    proc = subprocess.Popen(cmd, cwd=str(BACKEND_DIR), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
     import threading
 
-    def tee(stream, file):
-        for line in iter(stream.readline, b""):
-            decoded = line.decode("utf-8", errors="replace")
-            print(decoded, end="")
-            file.write(decoded)
-            file.flush()
-        file.close()
+    def tee_output() -> None:
+        assert proc.stdout is not None
+        for line in iter(proc.stdout.readline, b""):
+            text = line.decode("utf-8", errors="replace")
+            print(text, end="")
+            log_file.write(text)
+            log_file.flush()
+        log_file.close()
 
-    threading.Thread(target=tee, args=(proc.stdout, log_fd), daemon=True).start()
+    threading.Thread(target=tee_output, daemon=True).start()
     return proc
 
 
-# ─────────────────────── 前端开发服务器 ───────────────────────
-def start_frontend(node_ok: bool) -> list:
-    if not node_ok:
-        warn("Node.js 不可用，跳过前端启动。")
-        return []
-    procs = []
-    for label, dir_ in [("管理端", ADMIN_DIR), ("移动端", MOBILE_DIR)]:
-        ensure_node_modules(dir_, label)
-        log(f"启动{label}开发服务器...")
-        proc = subprocess.Popen(["npm", "run", "dev"], cwd=str(dir_))
-        procs.append(proc)
-    return procs
+def start_frontend_dev(label: str, app_dir: Path) -> subprocess.Popen:
+    npm = npm_cmd()
+    if not npm:
+        fail("未找到 npm。")
+    log(f"启动 {label} Vite 开发服务。")
+    return subprocess.Popen([npm, "run", "dev"], cwd=str(app_dir))
 
 
-# ─────────────────────── 日志追踪 ───────────────────────
 def tail_logs() -> None:
     if not LOG_FILE.exists():
-        warn(f"日志文件不存在：{LOG_FILE}，请先启动后端。")
+        warn(f"日志文件不存在：{LOG_FILE}")
         return
-    log(f"追踪日志：{LOG_FILE}  （Ctrl+C 退出）")
+    log(f"实时查看日志：{LOG_FILE}（Ctrl+C 退出）")
     try:
-        with open(LOG_FILE, "r", encoding="utf-8") as f:
-            f.seek(0, 2)
+        with LOG_FILE.open("r", encoding="utf-8", errors="replace") as file:
+            file.seek(0, 2)
             while True:
-                line = f.readline()
+                line = file.readline()
                 if line:
                     print(line, end="")
                 else:
                     time.sleep(0.3)
     except KeyboardInterrupt:
-        pass
+        return
 
 
-# ─────────────────────── 主流程 ───────────────────────
-def main() -> None:
+def print_summary(prod: bool, frontend_started: bool, nginx_started: bool) -> None:
+    print()
+    print(bold("服务已启动"))
+    print(f"  后端 API : http://127.0.0.1:{BACKEND_PORT}")
+    print(f"  API 文档 : http://127.0.0.1:{BACKEND_PORT}/docs")
+    print(f"  日志文件 : {LOG_FILE}")
+    if frontend_started:
+        print(f"  管理端   : http://localhost:{ADMIN_PORT}")
+        print(f"  移动端   : http://localhost:{MOBILE_PORT}")
+    if nginx_started:
+        print("  HTTPS 管理端 : https://localhost/")
+        print(f"  HTTPS 移动端 : https://localhost:{MOBILE_PORT}")
+    if prod:
+        print("  生产提示：请确认 .env 的 CORS_ALLOW_ORIGINS、JWT 密钥和数据库密码已改为正式值。")
+    print()
+    print(yellow("按 Ctrl+C 停止本脚本启动的后端/前端进程；Docker 服务会继续运行。"))
+    print(yellow("需要停止 Docker 基础服务时执行：python start.py --stop"))
+
+
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="校园弱电巡检管理系统一键启动脚本",
+        description="校园弱电巡检与资产管理系统一键启动/部署脚本",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument(
-        "--backend-only", action="store_true", help="只启动后端，不启动前端开发服务器"
-    )
-    parser.add_argument("--stop", action="store_true", help="停止 Docker 服务")
+    parser.add_argument("--backend-only", action="store_true", help="只启动 Docker 基础服务和后端")
+    parser.add_argument("--frontend-only", action="store_true", help="只启动两个前端开发服务")
+    parser.add_argument("--prod", action="store_true", help="生产部署：构建前端、启动 HTTPS Nginx、启动后端")
+    parser.add_argument("--build-frontends", action="store_true", help="只构建管理端和移动端前端")
+    parser.add_argument("--skip-install", action="store_true", help="跳过 pip/npm 依赖安装")
+    parser.add_argument("--skip-docker", action="store_true", help="跳过 Docker 服务启动")
+    parser.add_argument("--stop", action="store_true", help="停止 Docker Compose 服务")
     parser.add_argument("--logs", action="store_true", help="实时查看后端日志")
-    parser.add_argument("--status", action="store_true", help="查看各服务状态")
-    args = parser.parse_args()
+    parser.add_argument("--status", action="store_true", help="查看 Docker Compose 服务状态")
+    return parser.parse_args()
 
-    print(bold("\n===== 校园弱电巡检管理系统 =====\n"))
+
+def main() -> None:
+    args = parse_args()
+
+    print(bold("\n===== 校园弱电巡检与资产管理系统 ====="))
 
     if args.stop:
         stop_docker()
         return
-
     if args.logs:
         tail_logs()
         return
-
     if args.status:
         docker_status()
         return
 
-    # ── 依赖检查 ──
-    step("检查运行环境与依赖")
+    if args.prod and args.frontend_only:
+        fail("--prod 与 --frontend-only 不能同时使用。")
+    if args.backend_only and args.frontend_only:
+        fail("--backend-only 与 --frontend-only 不能同时使用。")
+
+    need_frontend = not args.backend_only or args.frontend_only or args.prod or args.build_frontends
+
+    step("检查运行环境")
     check_python_version()
-    check_docker()
-    node_ok = check_node()
-    ensure_env_file()
-    check_ports()
+    ensure_linux_executable_hint()
+    if not args.frontend_only and not args.build_frontends and not args.skip_docker:
+        check_docker()
+    node_ok = check_node(required=need_frontend)
+    ensure_env_file(prod=args.prod)
+    warn_if_ports_busy(include_frontend=need_frontend and not args.prod)
 
-    # ── 安装依赖 ──
-    step("安装 / 更新后端依赖")
-    ensure_venv()
+    if args.build_frontends:
+        step("构建前端")
+        if not node_ok:
+            fail("Node.js/npm 不可用，无法构建前端。")
+        build_frontend(ADMIN_DIR, "管理端", args.skip_install)
+        build_frontend(MOBILE_DIR, "移动端", args.skip_install)
+        return
 
-    if not args.backend_only and node_ok:
-        step("安装 / 更新前端依赖")
-        ensure_node_modules(ADMIN_DIR, "管理端")
-        ensure_node_modules(MOBILE_DIR, "移动端")
+    procs: list[subprocess.Popen] = []
 
-    # ── 启动服务 ──
-    step("启动 Docker 基础服务")
-    start_docker()
-    log("等待数据库就绪（约 4 秒）...")
-    time.sleep(4)
+    if not args.frontend_only:
+        step("准备后端环境")
+        ensure_venv(skip_install=args.skip_install)
 
-    step("启动后端服务")
-    backend_proc = start_backend()
+    if need_frontend and node_ok:
+        step("准备前端环境")
+        ensure_node_modules(ADMIN_DIR, "管理端", args.skip_install)
+        ensure_node_modules(MOBILE_DIR, "移动端", args.skip_install)
 
-    log("等待后端健康检查...")
-    if wait_for_http("http://127.0.0.1:18000/healthz"):
-        ok("后端服务就绪 → http://127.0.0.1:18000")
-    else:
-        warn("后端在 30 秒内未响应，请查看日志：python start.py --logs")
+    if args.prod and node_ok:
+        step("构建前端静态文件")
+        build_frontend(ADMIN_DIR, "管理端", skip_install=True)
+        build_frontend(MOBILE_DIR, "移动端", skip_install=True)
 
-    fe_procs = []
-    if not args.backend_only:
-        step("启动前端开发服务器")
-        fe_procs = start_frontend(node_ok)
-        time.sleep(3)
-        if node_ok:
-            ok("管理端 → http://localhost:5173")
-            ok("移动端 → http://localhost:5174")
+    if not args.frontend_only and not args.skip_docker:
+        step("启动 Docker 服务")
+        start_docker_services(include_nginx=args.prod)
 
-    # ── 汇总信息 ──
-    print()
-    print(bold("─── 服务运行中 ────────────────────────────────"))
-    print("  后端 API     : http://127.0.0.1:18000")
-    print("  API 文档     : http://127.0.0.1:18000/docs")
-    print(f"  运行日志     : {LOG_FILE}")
-    if not args.backend_only and node_ok:
-        print("  管理端       : http://localhost:5173")
-        print("  移动端       : http://localhost:5174")
-    print(bold("────────────────────────────────────────────────"))
-    print(yellow("按 Ctrl+C 停止后端（Docker 服务继续运行）"))
-    print()
+    if not args.frontend_only:
+        step("启动后端")
+        backend_proc = start_backend(prod=args.prod)
+        procs.append(backend_proc)
+        if wait_http(f"http://127.0.0.1:{BACKEND_PORT}/healthz", timeout=60):
+            ok("后端健康检查通过")
+        else:
+            warn(f"后端未在 60 秒内通过健康检查，请查看日志：{LOG_FILE}")
 
-    all_procs = [backend_proc] + fe_procs
+    frontend_started = False
+    if not args.backend_only and not args.prod:
+        step("启动前端开发服务")
+        procs.append(start_frontend_dev("管理端", ADMIN_DIR))
+        procs.append(start_frontend_dev("移动端", MOBILE_DIR))
+        frontend_started = True
 
-    def shutdown(sig, frame):
+    print_summary(prod=args.prod, frontend_started=frontend_started, nginx_started=args.prod)
+
+    def shutdown(_sig=None, _frame=None) -> None:
         print()
-        log("正在终止服务...")
-        for p in all_procs:
-            try:
-                p.terminate()
-            except Exception:
-                pass
-        ok("后端已停止。如需停止 Docker：python start.py --stop")
-        sys.exit(0)
+        log("正在停止本脚本启动的进程。")
+        for proc in procs:
+            if proc.poll() is None:
+                try:
+                    proc.terminate()
+                except Exception:
+                    pass
+        time.sleep(1)
+        for proc in procs:
+            if proc.poll() is None:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+        ok("进程已停止。Docker 服务如需关闭，请执行 python start.py --stop。")
+        raise SystemExit(0)
 
     signal.signal(signal.SIGINT, shutdown)
     signal.signal(signal.SIGTERM, shutdown)
 
     try:
-        backend_proc.wait()
+        while procs:
+            for proc in procs:
+                if proc.poll() is not None:
+                    warn(f"进程已退出，退出码：{proc.returncode}")
+                    shutdown()
+            time.sleep(1)
     except KeyboardInterrupt:
-        shutdown(None, None)
+        shutdown()
 
 
 if __name__ == "__main__":

@@ -449,6 +449,8 @@ button.danger {
 .building-room-row {
   animation: buildingRowIn 0.16s ease;
 }
+
+.asset-stack-layout {
   display: flex;
   flex-direction: column;
   gap: 16px;

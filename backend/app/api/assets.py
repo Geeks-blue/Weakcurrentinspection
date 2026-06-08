@@ -516,9 +516,9 @@ def download_rooms_template() -> Response:
     wb = Workbook()
     ws = wb.active
     ws.title = "房间导入模板"
-    ws.append(["序号", "楼名", "楼层", "弱电间位置", "编号", "备注"])
-    ws.append([1, "教学楼", "一楼", "南", "BFRJR-RDJ-001", ""])
-    ws.append([2, "教学楼", "二楼", "北", "BFRJR-RDJ-002", ""])
+    ws.append(["序号", "楼名", "楼层", "弱电间位置", "编号", "1月", "", "备注"])
+    ws.append([1, "教学楼", "一楼", "南", "BFRJR-RDJ-001", "", "", ""])
+    ws.append([2, "教学楼", "二楼", "北", "BFRJR-RDJ-002", "", "", ""])
     buf = BytesIO()
     wb.save(buf)
     buf.seek(0)
@@ -529,22 +529,62 @@ def download_rooms_template() -> Response:
     )
 
 
+@router.get("/template/items")
+def download_assets_template() -> Response:
+    from openpyxl import Workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "资产信息"
+    ws.append(["资产编号", "所属房间编号", "资产名称", "数量", "资产类别", "状态", "厂商", "型号", "备注"])
+    ws.append(["BFRJR-RDJ-003-A001", "BFRJR-RDJ-003", "交换机", 1, "weak_current", "in_use", "H3C", "S5560", ""])
+    ws.append(["BFRJR-RDJ-003-A002", "BFRJR-RDJ-003", "插排", 2, "weak_current", "in_use", "", "", ""])
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return Response(
+        content=buf.read(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=assets_template.xlsx"},
+    )
+
+
+def _copy_first_alias(row: dict[str, str], target: str, aliases: tuple[str, ...]) -> None:
+    if row.get(target):
+        return
+    for alias in aliases:
+        value = row.get(alias)
+        if value is not None and value.strip():
+            row[target] = value.strip()
+            return
+
+
 def _normalize_row_for_rooms(row: dict[str, str]) -> dict[str, str]:
     out = dict(row)
-    cn_map = {
-        "楼名": "building_name",
-        "楼层": "floor_label",
-        "弱电间位置": "location_text",
-        "编号": "room_code",
-        "备注": "note",
-    }
-    for cn, en in cn_map.items():
-        if cn in out and en not in out:
-            out[en] = out[cn]
-    if "building_code" not in out:
-        name = out.get("building_name", "").strip()
-        if name:
-            out["building_code"] = name
+    _copy_first_alias(out, "building_name", ("楼名", "楼栋", "楼栋名称", "建筑名称"))
+    _copy_first_alias(out, "building_code", ("楼栋编码", "building", "building_name", "楼名"))
+    _copy_first_alias(out, "floor_label", ("楼层", "所在楼层"))
+    _copy_first_alias(out, "location_text", ("弱电间位置", "弱电井位置", "位置", "房间位置"))
+    _copy_first_alias(out, "room_code", ("编号", "房间编号", "弱电间编号", "弱电井编号"))
+    _copy_first_alias(out, "note", ("备注",))
+
+    if not out.get("building_code"):
+        out["building_code"] = out.get("building_name", "").strip()
+    if not out.get("building_name"):
+        out["building_name"] = out.get("building_code", "").strip()
+    return out
+
+
+def _normalize_row_for_assets(row: dict[str, str]) -> dict[str, str]:
+    out = dict(row)
+    _copy_first_alias(out, "asset_code", ("资产编号", "资产编码", "编号"))
+    _copy_first_alias(out, "room_code", ("所属房间编号", "房间编号", "弱电间编号", "弱电井编号", "所属房间", "房间号"))
+    _copy_first_alias(out, "asset_name", ("资产名称", "名称", "设备名称"))
+    _copy_first_alias(out, "quantity", ("数量", "资产数量"))
+    _copy_first_alias(out, "asset_category", ("资产类别", "类别", "资产类型"))
+    _copy_first_alias(out, "status", ("状态", "资产状态"))
+    _copy_first_alias(out, "manufacturer", ("厂商", "厂家", "生产厂商"))
+    _copy_first_alias(out, "model", ("型号", "规格型号"))
+    _copy_first_alias(out, "note", ("备注",))
     return out
 
 
@@ -618,7 +658,7 @@ def import_assets(
     db: Session = Depends(get_db),
     _: User = Depends(require_teacher_or_admin),
 ) -> ImportSummary:
-    rows = _parse_table_file(file)
+    rows = [_normalize_row_for_assets(r) for r in _parse_table_file(file)]
     created_count = 0
     updated_count = 0
     skipped_count = 0
@@ -631,13 +671,13 @@ def import_assets(
 
         if not asset_code or not asset_name or not room_code:
             skipped_count += 1
-            errors.append(f"第{index}行缺少 asset_code / asset_name / room_code")
+            errors.append(f"第{index}行缺少资产编号/资产名称/所属房间编号")
             continue
 
         room = db.query(Room).filter(Room.room_code == room_code).first()
         if not room:
             skipped_count += 1
-            errors.append(f"第{index}行 room_code 不存在: {room_code}")
+            errors.append(f"第{index}行所属房间编号不存在: {room_code}")
             continue
 
         quantity_text = row.get("quantity", "1").strip()
@@ -645,7 +685,7 @@ def import_assets(
             quantity = max(1, int(float(quantity_text or "1")))
         except ValueError:
             skipped_count += 1
-            errors.append(f"第{index}行 quantity 非法: {quantity_text}")
+            errors.append(f"第{index}行数量非法: {quantity_text}")
             continue
 
         asset = db.query(Asset).filter(Asset.asset_code == asset_code).first()

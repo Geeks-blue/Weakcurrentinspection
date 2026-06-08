@@ -256,10 +256,15 @@ function toggleDispatchStudent(id: number): void {
 }
 
 // 性别感知 + 楼栋亲和性均分预览
-const dispatchPreview = computed(() => {
+type DispatchPreview = {
+  rows: { username: string; count: number; gender: string | null | undefined }[];
+  warnings: string[];
+};
+
+const dispatchPreview = computed<DispatchPreview>(() => {
   const rooms = dispatchRoomIds.value;
   const students = dispatchStudentIds.value;
-  if (!rooms.length || !students.length) return [];
+  if (!rooms.length || !students.length) return { rows: [], warnings: [] };
 
   const studentMap = new Map(dispatchStudents.value.map(s => [s.student_user_id, s]));
   const roomMap = new Map(dispatchRooms.value.map(r => [r.room_id, r]));
@@ -457,6 +462,7 @@ const printPersonName = ref("");
 const printPersonContact = ref("");
 const printScope = ref<"all" | "selected">("all");
 const actionRoom = ref<AssetRoomItem | null>(null);
+const showRoomActionDialog = ref(false);
 const showAssetActionDialog = ref(false);
 const actionAsset = ref<AssetItemView | null>(null);
 const selectedRoomId = ref<number | null>(null);
@@ -654,6 +660,7 @@ function openRoomActionDialog(room: AssetRoomItem): void {
   editingRoom.value = { ...room };
   editingRoomId.value = room.room_id;
   actionRoom.value = room;
+  showRoomActionDialog.value = true;
 }
 
 function editSelectedRoom(): void {
@@ -698,6 +705,15 @@ async function submitRoomActionEdit(): Promise<void> {
   }
 }
 
+async function roomActionDelete(): Promise<void> {
+  if (!actionRoom.value) return;
+  await handleDeleteRoom(actionRoom.value.room_id);
+  if (!showRoomDeleteConfirm.value) {
+    showRoomActionDialog.value = false;
+    actionRoom.value = null;
+  }
+}
+
 async function submitAssetActionEdit(): Promise<void> {
   if (!editingAssetId.value || !editingAsset.value) return;
   try {
@@ -709,6 +725,13 @@ async function submitAssetActionEdit(): Promise<void> {
   } catch (e) {
     assetError.value = e instanceof Error ? e.message : String(e);
   }
+}
+
+async function assetActionDelete(): Promise<void> {
+  if (!actionAsset.value) return;
+  await handleDeleteAsset(actionAsset.value.asset_id);
+  showAssetActionDialog.value = false;
+  actionAsset.value = null;
 }
 
 function buildDefaultDueAt(): string {
@@ -2095,10 +2118,12 @@ onMounted(async () => {
             <button class="ghost" :disabled="assetLoading" @click="loadAssetData">{{ assetLoading ? "加载中..." : "刷新资产数据" }}</button>
             <button @click="openRoomDialog()">新增房间</button>
             <button @click="openAssetDialog()">新增资产</button>
-            <button class="ghost" :disabled="importingRooms" @click="triggerRoomsImport">{{ importingRooms ? "导入中..." : "导入房间表" }}</button>
-            <a class="ghost btn-link" :href="`${getBackendBaseUrl()}/assets/template/rooms`" download="rooms_template.xlsx">下载房间模板</a>
-            <button class="ghost" :disabled="importingAssets" @click="triggerAssetsImport">{{ importingAssets ? "导入中..." : "导入资产表" }}</button>
+            <button class="ghost" :disabled="importingRooms" @click="triggerRoomsImport">{{ importingRooms ? "导入中..." : "导入楼栋/房间表" }}</button>
+            <a class="ghost btn-link" :href="`${getBackendBaseUrl()}/assets/template/rooms`" download="rooms_template.xlsx">下载楼栋模板</a>
+            <button class="ghost" :disabled="importingAssets" @click="triggerAssetsImport">{{ importingAssets ? "导入中..." : "导入资产信息表" }}</button>
+            <a class="ghost btn-link" :href="`${getBackendBaseUrl()}/assets/template/items`" download="assets_template.xlsx">下载资产模板</a>
           </div>
+          <p class="hint">房间表支持列：序号、楼名、楼层、弱电间位置、编号、备注；资产表支持列：资产编号、所属房间编号、资产名称、数量、资产类别、状态、厂商、型号、备注。</p>
           <p class="hint" v-if="assetMessage">{{ assetMessage }}</p>
           <p class="error" v-if="assetError">{{ assetError }}</p>
 
@@ -2117,9 +2142,9 @@ onMounted(async () => {
                 <table class="data-table">
                   <thead>
                     <tr>
-                      <th>房间</th>
+                      <th>弱电间编号</th>
                       <th>楼层</th>
-                      <th>位置</th>
+                      <th>弱电间位置</th>
                       <th>状态</th>
                       <th>性别限制</th>
                       <th>资产数</th>
@@ -2219,10 +2244,10 @@ onMounted(async () => {
                 <table class="data-table" v-else>
                   <thead>
                     <tr>
-                      <th>资产编码</th>
-                      <th>名称</th>
+                      <th>资产编号</th>
+                      <th>资产名称</th>
                       <th>型号</th>
-                      <th>厂家</th>
+                      <th>厂商</th>
                       <th>数量</th>
                       <th>状态</th>
                       <th>备注</th>
@@ -2661,11 +2686,11 @@ onMounted(async () => {
         <div class="dialog-two-col">
           <div class="grid">
             <div class="row">
-              <label>楼栋编码</label>
+              <label>楼名</label>
               <input v-model="editingRoom.building_code" />
             </div>
             <div class="row">
-              <label>房间号</label>
+              <label>弱电间编号</label>
               <input v-model="editingRoom.room_code" />
             </div>
             <div class="row">
@@ -2673,7 +2698,7 @@ onMounted(async () => {
               <input v-model="editingRoom.floor_label" />
             </div>
             <div class="row">
-              <label>位置</label>
+              <label>弱电间位置</label>
               <input v-model="editingRoom.location_text" />
             </div>
             <div class="row">
@@ -2714,19 +2739,19 @@ onMounted(async () => {
         <div class="dialog-two-col">
           <div class="grid">
             <div class="row">
-              <label>资产编码</label>
+              <label>资产编号</label>
               <input v-model="editingAsset.asset_code" />
             </div>
             <div class="row">
-              <label>名称</label>
+              <label>资产名称</label>
               <input v-model="editingAsset.asset_name" />
             </div>
             <div class="row">
-              <label>类别</label>
+              <label>资产类别</label>
               <input v-model="editingAsset.asset_category" />
             </div>
             <div class="row">
-              <label>房间号</label>
+              <label>所属房间编号</label>
               <input v-model="editingAsset.room_code" />
             </div>
             <div class="row">
@@ -2738,7 +2763,7 @@ onMounted(async () => {
               <input v-model="editingAsset.status" />
             </div>
             <div class="row">
-              <label>厂家</label>
+              <label>厂商</label>
               <input v-model="editingAsset.manufacturer" />
             </div>
             <div class="row">
@@ -2794,11 +2819,11 @@ onMounted(async () => {
         <h3>{{ editingRoomId ? "编辑房间" : "新增房间" }}</h3>
         <div class="grid">
           <div class="row">
-            <label>楼栋编码</label>
+            <label>楼名</label>
             <input v-model="editingRoom.building_code" />
           </div>
           <div class="row">
-            <label>房间号</label>
+            <label>弱电间编号</label>
             <input v-model="editingRoom.room_code" />
           </div>
           <div class="row">
@@ -2806,7 +2831,7 @@ onMounted(async () => {
             <input v-model="editingRoom.floor_label" />
           </div>
           <div class="row">
-            <label>位置</label>
+            <label>弱电间位置</label>
             <input v-model="editingRoom.location_text" />
           </div>
           <div class="row">
@@ -2838,19 +2863,19 @@ onMounted(async () => {
         <h3>{{ editingAssetId ? "编辑资产" : "新增资产" }}</h3>
         <div class="grid">
           <div class="row">
-            <label>资产编码</label>
+            <label>资产编号</label>
             <input v-model="editingAsset.asset_code" />
           </div>
           <div class="row">
-            <label>名称</label>
+            <label>资产名称</label>
             <input v-model="editingAsset.asset_name" />
           </div>
           <div class="row">
-            <label>类别</label>
+            <label>资产类别</label>
             <input v-model="editingAsset.asset_category" />
           </div>
           <div class="row">
-            <label>房间号</label>
+            <label>所属房间编号</label>
             <input v-model="editingAsset.room_code" />
           </div>
           <div class="row">
@@ -2862,7 +2887,7 @@ onMounted(async () => {
             <input v-model="editingAsset.status" />
           </div>
           <div class="row">
-            <label>厂家</label>
+            <label>厂商</label>
             <input v-model="editingAsset.manufacturer" />
           </div>
           <div class="row">

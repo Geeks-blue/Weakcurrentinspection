@@ -1,0 +1,92 @@
+<view class="container">
+  <view class="top-bar">
+    <view>
+      <text class="page-title">待审核巡检</text>
+      <text class="hint">{{username}}</text>
+    </view>
+    <text class="logout-btn" bindtap="onLogout">退出</text>
+  </view>
+
+  <view class="loading-tip" wx:if="{{loading}}">加载中...</view>
+  <text class="error-tip" wx:elif="{{error}}">{{error}}</text>
+  <view class="empty-tip" wx:elif="{{items.length === 0 && !loading}}">暂无待审核记录 ✅</view>
+
+  <view class="card review-card" wx:for="{{items}}" wx:key="inspection_id">
+    <!-- 头部：点击展开/收起 -->
+    <view class="rev-head" data-id="{{item.inspection_id}}" bindtap="toggleExpand">
+      <view>
+        <text class="rev-room">{{item.building_code}} / {{item.room_code}}</text>
+        <text class="hint">{{item.student_username}} · {{item.dateStr}}</text>
+      </view>
+      <view style="display:flex;align-items:center;gap:12rpx">
+        <view class="badge {{item.statusClass}}">{{item.statusLabel}}</view>
+        <text class="expand-icon">{{expanded[item.inspection_id] ? '▲' : '▼'}}</text>
+      </view>
+    </view>
+
+    <!-- 展开详情 -->
+    <view wx:if="{{expanded[item.inspection_id]}}">
+      <view class="divider"></view>
+      <view class="label-row"><text>锁闭</text><text>{{item.lockLabel}}</text></view>
+      <view class="label-row"><text>杂物</text><text>{{item.clutterLabel}}</text></view>
+      <view class="label-row"><text>指示灯</text><text>{{item.indicatorLabel}}</text></view>
+      <view class="label-row"><text>资产</text><text>{{item.assetLabel}}</text></view>
+      <view class="label-row" wx:if="{{item.remark_text}}">
+        <text>备注</text><text>{{item.remark_text}}</text>
+      </view>
+
+      <view class="photo-strip" wx:if="{{item.photo_urls && item.photo_urls.length > 0}}">
+        <image
+          wx:for="{{item.photo_urls}}"
+          wx:for-item="url"
+          wx:key="url"
+          src="{{url}}"
+          mode="aspectFill"
+          class="photo-thumb"
+          data-urls="{{item.photo_urls}}"
+          data-current="{{url}}"
+          bindtap="onPreviewPhoto"
+        />
+      </view>
+
+      <!-- 审核操作 -->
+      <view class="review-actions">
+        <button
+          class="btn btn-primary btn-sm"
+          loading="{{reviewing[item.inspection_id]}}"
+          disabled="{{reviewing[item.inspection_id]}}"
+          data-id="{{item.inspection_id}}"
+          bindtap="onApprove"
+        >✓ 通过</button>
+        <button
+          class="btn btn-ghost btn-sm"
+          disabled="{{reviewing[item.inspection_id]}}"
+          data-id="{{item.inspection_id}}"
+          bindtap="onRectify"
+        >需整改</button>
+        <button
+          class="btn btn-danger btn-sm"
+          disabled="{{reviewing[item.inspection_id]}}"
+          data-id="{{item.inspection_id}}"
+          bindtap="onReject"
+        >✕ 驳回</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 底部导航 -->
+  <view class="nav-bar">
+    <view class="nav-item active">
+      <text class="nav-icon">📝</text>
+      <text>待审核</text>
+    </view>
+    <view class="nav-item" bindtap="goRecords">
+      <text class="nav-icon">📊</text>
+      <text>记录总览</text>
+    </view>
+    <view class="nav-item" bindtap="goDispatch">
+      <text class="nav-icon">📤</text>
+      <text>派发任务</text>
+    </view>
+  </view>
+</view>

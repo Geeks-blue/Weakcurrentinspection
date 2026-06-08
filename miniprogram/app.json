@@ -1,0 +1,20 @@
+{
+  "pages": [
+    "pages/login/login",
+    "pages/student/tasks/tasks",
+    "pages/student/inspect/inspect",
+    "pages/student/history/history",
+    "pages/admin/review/review",
+    "pages/admin/records/records",
+    "pages/admin/dispatch/dispatch"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#1a3a6e",
+    "navigationBarTextStyle": "white",
+    "navigationBarTitleText": "弱电巡检",
+    "backgroundColor": "#f0f4ff",
+    "backgroundTextStyle": "light"
+  },
+  "usingComponents": {},
+  "sitemapLocation": "sitemap.json"
+}

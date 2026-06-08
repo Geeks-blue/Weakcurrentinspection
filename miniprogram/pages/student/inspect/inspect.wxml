@@ -1,0 +1,132 @@
+<scroll-view scroll-y class="inspect-scroll">
+<view class="container">
+  <!-- 房间信息卡 -->
+  <view class="card room-info-card">
+    <view class="room-title">🏢 {{buildingName}} · {{roomCode}}</view>
+    <text class="hint" wx:if="{{floor || location}}">{{floor}} {{location}}</text>
+    <text class="hint">任务：{{taskTitle}}</text>
+  </view>
+
+  <!-- 签到方式 -->
+  <view class="card">
+    <view class="section-title">签到方式</view>
+    <view class="checkin-tabs">
+      <view class="ctab {{checkinMode==='qr'?'active':''}}" bindtap="switchQR">📷 扫二维码</view>
+      <view class="ctab {{checkinMode==='manual'?'active':''}}" bindtap="switchManual">✏️ 手动输入</view>
+    </view>
+
+    <view wx:if="{{checkinMode==='qr'}}">
+      <view class="scan-result" wx:if="{{scannedCode}}">
+        <text class="success-tip">✅ 已扫码：{{scannedCode}}</text>
+      </view>
+      <button class="btn btn-ghost btn-sm" style="margin-top:16rpx" bindtap="onScanQR">
+        {{scannedCode ? '重新扫码' : '扫描二维码'}}
+      </button>
+    </view>
+
+    <view wx:else>
+      <view class="field" style="margin-top:16rpx">
+        <input class="manual-input" placeholder="输入房间编码" value="{{manualCode}}" bindinput="onManualInput" />
+      </view>
+    </view>
+  </view>
+
+  <!-- 参考照片 -->
+  <view class="card" wx:if="{{refPhotoUrl}}">
+    <view class="section-title">参考照片</view>
+    <image src="{{refPhotoUrl}}" mode="widthFix" class="ref-photo" data-src="{{refPhotoUrl}}" bindtap="onPreviewPhoto" />
+  </view>
+
+  <!-- 巡检项目 -->
+  <view class="card">
+    <view class="section-title">锁闭状态</view>
+    <view class="option-group">
+      <view class="option-btn {{lockState==='locked'?'selected':''}}" bindtap="setLock" data-v="locked">已锁</view>
+      <view class="option-btn {{lockState==='unlocked'?'selected':''}}" bindtap="setLock" data-v="unlocked">未锁</view>
+      <view class="option-btn {{lockState==='lock_damaged'?'selected':''}}" bindtap="setLock" data-v="lock_damaged">门锁损坏</view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">环境杂物</view>
+    <view class="option-group">
+      <view class="option-btn {{clutterState==='none'?'selected':''}}" bindtap="setClutter" data-v="none">无杂物</view>
+      <view class="option-btn {{clutterState==='stacked_items'?'selected':''}}" bindtap="setClutter" data-v="stacked_items">有堆放物</view>
+      <view class="option-btn {{clutterState==='water'?'selected':''}}" bindtap="setClutter" data-v="water">有积水</view>
+      <view class="option-btn {{clutterState==='odor'?'selected':''}}" bindtap="setClutter" data-v="odor">有异味</view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">设备指示灯</view>
+    <view class="option-group">
+      <view class="option-btn {{indicatorState==='all_ok'?'selected':''}}" bindtap="setIndicator" data-v="all_ok">全部正常</view>
+      <view class="option-btn {{indicatorState==='partial_abnormal'?'selected':''}}" bindtap="setIndicator" data-v="partial_abnormal">个别异常</view>
+      <view class="option-btn {{indicatorState==='all_abnormal'?'selected':''}}" bindtap="setIndicator" data-v="all_abnormal">全部异常</view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">资产核对</view>
+    <view class="option-group">
+      <view class="option-btn {{assetMatchState==='matched'?'selected':''}}" bindtap="setAsset" data-v="matched">与台账一致</view>
+      <view class="option-btn {{assetMatchState==='missing'?'selected':''}}" bindtap="setAsset" data-v="missing">资产缺失</view>
+      <view class="option-btn {{assetMatchState==='extra'?'selected':''}}" bindtap="setAsset" data-v="extra">资产多余</view>
+      <view class="option-btn {{assetMatchState==='moved'?'selected':''}}" bindtap="setAsset" data-v="moved">位置变动</view>
+    </view>
+    <!-- 资产台账展开 -->
+    <view class="assets-toggle" bindtap="toggleAssets">
+      <text class="hint">{{showAssets ? '▲ 收起资产台账' : '▼ 查看资产台账 ('+roomAssets.length+' 件)'}}</text>
+    </view>
+    <view wx:if="{{showAssets}}">
+      <view wx:if="{{assetsLoading}}" class="hint">加载中...</view>
+      <view wx:elif="{{roomAssets.length === 0}}" class="hint">暂无资产记录</view>
+      <view wx:else>
+        <view class="asset-row" wx:for="{{roomAssets}}" wx:key="asset_id">
+          <text class="asset-name">{{item.asset_name}}</text>
+          <text class="hint">×{{item.quantity}} {{item.model}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 备注 -->
+  <view class="card">
+    <view class="section-title">备注（选填）</view>
+    <textarea class="remark-input" placeholder="如有异常情况请填写..." value="{{remark}}" bindinput="onRemarkInput" />
+  </view>
+
+  <!-- 拍照 -->
+  <view class="card">
+    <view class="section-title">巡检照片</view>
+    <view class="photo-grid">
+      <view class="photo-item" wx:for="{{photos}}" wx:key="id">
+        <image src="{{item.localPath}}" mode="aspectFill" class="photo-thumb" data-src="{{item.localPath}}" bindtap="onPreviewPhoto" />
+        <view class="photo-loading" wx:if="{{item.uploading}}">
+          <text>上传中</text>
+        </view>
+        <view class="photo-err" wx:elif="{{item.error}}">
+          <text>{{item.error}}</text>
+        </view>
+        <view class="photo-del" data-id="{{item.id}}" bindtap="onDeletePhoto">✕</view>
+      </view>
+      <view class="add-photo" bindtap="onTakePhoto">
+        <text class="add-icon">📷</text>
+        <text class="hint">添加照片</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 提交 -->
+  <view class="submit-area">
+    <text class="error-tip" wx:if="{{submitError}}">{{submitError}}</text>
+    <text class="success-tip" wx:if="{{submitOk}}">✅ 提交成功，正在返回...</text>
+    <button
+      class="btn btn-primary"
+      loading="{{submitting}}"
+      disabled="{{submitting || submitOk}}"
+      bindtap="onSubmit"
+    >{{submitting ? '提交中...' : '提交巡检'}}</button>
+  </view>
+</view>
+</scroll-view>

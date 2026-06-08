@@ -1,0 +1,12 @@
+.loading-tip, .empty-tip { text-align:center; color:#8899bb; font-size:28rpx; margin-top:60rpx; }
+.filter-card { padding:20rpx 24rpx; }
+.filter-row { display:flex; align-items:center; margin-bottom:14rpx; }
+.filter-label { width:100rpx; font-size:26rpx; color:#6880a8; flex-shrink:0; }
+.filter-val { font-size:26rpx; color:#1a3a6e; padding:10rpx 0; }
+.filter-input { flex:1; font-size:26rpx; color:#1e3060; border-bottom:1rpx solid #dde6f8; padding:8rpx 0; }
+.rec-card { padding:20rpx 24rpx; }
+.rec-head { display:flex; align-items:flex-start; justify-content:space-between; }
+.rec-room { font-size:28rpx; font-weight:600; color:#1a3a6e; display:block; }
+.expand-icon { color:#8899bb; font-size:22rpx; }
+.photo-strip { display:flex; flex-wrap:wrap; gap:10rpx; margin-top:12rpx; }
+.photo-sm { width:130rpx; height:100rpx; border-radius:8rpx; }

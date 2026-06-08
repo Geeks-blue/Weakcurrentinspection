@@ -1,0 +1,52 @@
+.inspect-scroll { height: 100vh; }
+.room-info-card { background: linear-gradient(135deg, #1a3a6e, #2a5cc8); }
+.room-title { font-size: 32rpx; font-weight: 700; color: #fff; margin-bottom: 8rpx; }
+.room-info-card .hint { color: rgba(255,255,255,0.8); }
+.section-title { font-size: 28rpx; font-weight: 600; color: #1a3a6e; margin-bottom: 16rpx; }
+.checkin-tabs { display: flex; gap: 16rpx; margin-bottom: 16rpx; }
+.ctab {
+  flex: 1; text-align: center; padding: 16rpx;
+  border-radius: 12rpx; background: #edf3ff;
+  color: #4060a0; font-size: 26rpx;
+  border: 2rpx solid transparent;
+}
+.ctab.active { background: #2a5cc8; color: #fff; }
+.manual-input {
+  background: #f4f8ff; border: 1rpx solid #c8d8f0;
+  border-radius: 12rpx; padding: 18rpx 20rpx; font-size: 28rpx;
+}
+.scan-result { padding: 12rpx 0; }
+.ref-photo { width: 100%; border-radius: 12rpx; }
+.assets-toggle { margin-top: 16rpx; text-align: right; }
+.asset-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10rpx 0; border-bottom: 1rpx solid #e8eef8;
+}
+.asset-name { font-size: 26rpx; color: #1e3060; }
+.remark-input {
+  width: 100%; background: #f4f8ff; border: 1rpx solid #c8d8f0;
+  border-radius: 12rpx; padding: 16rpx; font-size: 26rpx;
+  min-height: 120rpx; box-sizing: border-box;
+}
+.photo-grid { display: flex; flex-wrap: wrap; gap: 16rpx; }
+.photo-item { position: relative; width: 180rpx; height: 180rpx; }
+.photo-thumb { width: 180rpx; height: 180rpx; border-radius: 12rpx; object-fit: cover; }
+.photo-del {
+  position: absolute; top: -12rpx; right: -12rpx;
+  width: 40rpx; height: 40rpx; border-radius: 20rpx;
+  background: #c0280a; color: #fff; font-size: 22rpx;
+  display: flex; align-items: center; justify-content: center;
+}
+.photo-loading, .photo-err {
+  position: absolute; inset: 0; background: rgba(0,0,0,0.5);
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 12rpx;
+}
+.photo-loading text, .photo-err text { color: #fff; font-size: 22rpx; }
+.add-photo {
+  width: 180rpx; height: 180rpx; border-radius: 12rpx;
+  border: 2rpx dashed #c8d8f0; display: flex;
+  flex-direction: column; align-items: center; justify-content: center; gap: 8rpx;
+}
+.add-icon { font-size: 48rpx; }
+.submit-area { margin-top: 24rpx; }

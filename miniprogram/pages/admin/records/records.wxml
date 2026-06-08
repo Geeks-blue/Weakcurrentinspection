@@ -1,0 +1,67 @@
+<view class="container">
+  <view class="page-title">巡检记录总览</view>
+
+  <!-- 筛选 -->
+  <view class="card filter-card">
+    <view class="filter-row">
+      <text class="filter-label">状态</text>
+      <picker mode="selector" range="{{statusOptions}}" range-key="label" bindchange="onFilterStatusChange">
+        <view class="filter-val">{{filterStatus || '全部'}} ▾</view>
+      </picker>
+    </view>
+    <view class="filter-row">
+      <text class="filter-label">房间号</text>
+      <input class="filter-input" placeholder="输入房间号" value="{{filterRoom}}" bindinput="onFilterRoomInput" />
+    </view>
+    <view class="filter-row">
+      <text class="filter-label">学生</text>
+      <input class="filter-input" placeholder="输入学生用户名" value="{{filterStudent}}" bindinput="onFilterStudentInput" />
+    </view>
+    <button class="btn btn-primary btn-sm" style="margin-top:12rpx" bindtap="onSearch">查 询</button>
+  </view>
+
+  <view class="loading-tip" wx:if="{{loading}}">加载中...</view>
+  <text class="error-tip" wx:elif="{{error}}">{{error}}</text>
+  <view class="empty-tip" wx:elif="{{records.length === 0 && !loading}}">暂无记录</view>
+
+  <view class="card rec-card" wx:for="{{records}}" wx:key="inspection_id">
+    <view class="rec-head" data-id="{{item.inspection_id}}" bindtap="toggleExpand">
+      <view>
+        <text class="rec-room">{{item.building_code}}/{{item.room_code}}</text>
+        <text class="hint">{{item.student_username}} · {{item.dateStr}}</text>
+      </view>
+      <view style="display:flex;gap:10rpx;align-items:center">
+        <view class="badge {{item.statusClass}}">{{item.statusLabel}}</view>
+        <text class="expand-icon">{{expanded[item.inspection_id] ? '▲' : '▼'}}</text>
+      </view>
+    </view>
+    <view wx:if="{{expanded[item.inspection_id]}}">
+      <view class="divider"></view>
+      <view class="label-row"><text>锁闭</text><text>{{item.lockLabel}}</text></view>
+      <view class="label-row"><text>指示灯</text><text>{{item.indicatorLabel}}</text></view>
+      <view class="label-row" wx:if="{{item.remark_text}}"><text>备注</text><text>{{item.remark_text}}</text></view>
+      <view class="photo-strip" wx:if="{{item.photo_urls && item.photo_urls.length}}">
+        <image
+          wx:for="{{item.photo_urls}}"
+          wx:for-item="url"
+          wx:key="url"
+          src="{{url}}" mode="aspectFill" class="photo-sm"
+          data-urls="{{item.photo_urls}}" data-current="{{url}}"
+          bindtap="onPreviewPhoto"
+        />
+      </view>
+    </view>
+  </view>
+
+  <view class="nav-bar">
+    <view class="nav-item" bindtap="goBack">
+      <text class="nav-icon">📝</text><text>待审核</text>
+    </view>
+    <view class="nav-item active">
+      <text class="nav-icon">📊</text><text>记录总览</text>
+    </view>
+    <view class="nav-item" bindtap="() => wx.navigateTo({url:'/pages/admin/dispatch/dispatch'})">
+      <text class="nav-icon">📤</text><text>派发任务</text>
+    </view>
+  </view>
+</view>

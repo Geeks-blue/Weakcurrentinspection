@@ -1,0 +1,65 @@
+<view class="container">
+  <!-- 顶部用户栏 -->
+  <view class="top-bar">
+    <view>
+      <text class="page-title">我的任务</text>
+      <text class="hint">{{username}}</text>
+    </view>
+    <text class="logout-btn" bindtap="onLogout">退出</text>
+  </view>
+
+  <!-- 搜索框 -->
+  <view class="search-wrap card">
+    <input
+      class="search-input"
+      placeholder="搜索任务/房间/楼栋"
+      value="{{filterText}}"
+      bindinput="onFilterInput"
+    />
+  </view>
+
+  <!-- 加载中 -->
+  <view class="loading-tip" wx:if="{{loading}}">加载中...</view>
+  <text class="error-tip" wx:elif="{{error}}">{{error}}</text>
+
+  <!-- 任务列表 -->
+  <view wx:elif="{{filteredTasks.length === 0 && !loading}}">
+    <view class="empty-tip">暂无待巡检任务 🎉</view>
+  </view>
+
+  <view
+    class="task-card card"
+    wx:for="{{filteredTasks}}"
+    wx:key="assignment_id"
+    data-task="{{item}}"
+    bindtap="onTaskTap"
+  >
+    <view class="task-head">
+      <text class="task-title">{{item.task_title}}</text>
+      <view class="badge {{item.statusClass}}">{{item.statusLabel}}</view>
+    </view>
+    <view class="task-room">
+      <text class="room-icon">🏢</text>
+      <text>{{item.building_name}} · {{item.room_code}}</text>
+    </view>
+    <view class="task-meta" wx:if="{{item.floor_label || item.location_text}}">
+      <text class="hint">{{item.floor_label}} {{item.location_text}}</text>
+    </view>
+    <view class="task-due">
+      <text class="hint">截止：{{item.dueDateShort}}</text>
+      <text class="go-arrow">→</text>
+    </view>
+  </view>
+
+  <!-- 底部导航 -->
+  <view class="nav-bar">
+    <view class="nav-item active">
+      <text class="nav-icon">📋</text>
+      <text>任务</text>
+    </view>
+    <view class="nav-item" bindtap="goHistory">
+      <text class="nav-icon">📁</text>
+      <text>记录</text>
+    </view>
+  </view>
+</view>

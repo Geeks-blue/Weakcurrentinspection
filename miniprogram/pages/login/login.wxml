@@ -1,0 +1,42 @@
+<view class="login-wrap">
+  <view class="login-card">
+    <view class="login-logo">🔌</view>
+    <view class="login-title">弱电巡检系统</view>
+    <view class="login-sub">校园弱电设施巡检管理</view>
+
+    <view class="field">
+      <text class="field-label">用户名</text>
+      <input
+        class="login-input"
+        placeholder="请输入用户名"
+        value="{{username}}"
+        bindinput="onInputUsername"
+        confirm-type="next"
+      />
+    </view>
+
+    <view class="field" style="margin-top:20rpx">
+      <text class="field-label">密码</text>
+      <input
+        class="login-input"
+        placeholder="请输入密码"
+        password
+        value="{{password}}"
+        bindinput="onInputPassword"
+        confirm-type="done"
+        bindconfirm="onLogin"
+      />
+    </view>
+
+    <text class="error-tip" wx:if="{{error}}">{{error}}</text>
+
+    <button
+      class="btn btn-primary login-btn"
+      loading="{{loading}}"
+      disabled="{{loading}}"
+      bindtap="onLogin"
+    >{{loading ? '登录中...' : '登 录'}}</button>
+
+    <text class="login-hint">管理员/教师 → 进入管理端\n学生 → 进入巡检端</text>
+  </view>
+</view>

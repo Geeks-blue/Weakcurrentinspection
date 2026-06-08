@@ -1,0 +1,46 @@
+.top-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+}
+.logout-btn {
+  font-size: 26rpx;
+  color: #8899bb;
+  padding: 8rpx 0;
+}
+.search-wrap { padding: 16rpx 20rpx; margin-bottom: 20rpx; }
+.search-input {
+  font-size: 28rpx;
+  color: #1e3060;
+}
+.loading-tip, .empty-tip {
+  text-align: center;
+  color: #8899bb;
+  font-size: 28rpx;
+  margin-top: 80rpx;
+}
+.task-card { padding: 24rpx 24rpx; cursor: pointer; }
+.task-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12rpx;
+}
+.task-title { font-size: 30rpx; font-weight: 600; color: #1a3a6e; flex: 1; }
+.task-room {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  font-size: 28rpx;
+  color: #2a5cc8;
+  margin-bottom: 8rpx;
+}
+.room-icon { font-size: 28rpx; }
+.task-due {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8rpx;
+}
+.go-arrow { color: #2a5cc8; font-size: 28rpx; }

@@ -1,0 +1,172 @@
+/* 弱电巡检小程序 - 全局样式 */
+page {
+  background: #f0f4ff;
+  font-family: -apple-system, 'PingFang SC', sans-serif;
+  color: #1e3060;
+}
+
+/* ---- 通用容器 ---- */
+.container {
+  padding: 24rpx 28rpx 160rpx;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+/* ---- 卡片 ---- */
+.card {
+  background: #fff;
+  border-radius: 18rpx;
+  padding: 28rpx 28rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 2rpx 16rpx rgba(30, 48, 96, 0.07);
+}
+
+/* ---- 按钮 ---- */
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 88rpx;
+  border-radius: 44rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  border: none;
+  margin: 0;
+}
+.btn-primary {
+  background: linear-gradient(90deg, #1a3a6e, #2a5cc8);
+  color: #fff;
+}
+.btn-ghost {
+  background: #edf3ff;
+  color: #1a3a6e;
+  border: 1rpx solid #c0d4f8;
+}
+.btn-danger {
+  background: linear-gradient(90deg, #c0280a, #e04020);
+  color: #fff;
+}
+.btn-sm {
+  height: 64rpx;
+  border-radius: 32rpx;
+  font-size: 26rpx;
+  padding: 0 28rpx;
+}
+.btn[disabled] { opacity: 0.5; }
+
+/* ---- 状态徽章 ---- */
+.badge {
+  display: inline-block;
+  padding: 4rpx 16rpx;
+  border-radius: 20rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+}
+.badge-pending  { background: #fff7e0; color: #b87800; }
+.badge-submitted { background: #e8f0fb; color: #1a5cb0; }
+.badge-approved  { background: #e0f5e8; color: #1a7a3c; }
+.badge-rejected  { background: #ffe8e6; color: #c0280a; }
+.badge-rectify   { background: #fff0e0; color: #b85000; }
+.badge-done      { background: #e8ffe8; color: #186028; }
+
+/* ---- 标签行 ---- */
+.label-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+.label-row text:first-child {
+  width: 160rpx;
+  color: #6880a8;
+  font-size: 26rpx;
+  flex-shrink: 0;
+}
+.label-row text:last-child {
+  flex: 1;
+  font-size: 28rpx;
+  color: #1e3060;
+}
+
+/* ---- 错误/提示 ---- */
+.error-tip { color: #c0280a; font-size: 26rpx; margin-top: 12rpx; }
+.success-tip { color: #1a7a3c; font-size: 26rpx; margin-top: 12rpx; }
+.hint { color: #8899bb; font-size: 24rpx; margin-top: 8rpx; }
+
+/* ---- 分隔线 ---- */
+.divider { height: 1rpx; background: #e8eef8; margin: 20rpx 0; }
+
+/* ---- 底部导航条 ---- */
+.nav-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 110rpx;
+  background: #fff;
+  border-top: 1rpx solid #dde6f8;
+  display: flex;
+  align-items: center;
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 100;
+}
+.nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4rpx;
+}
+.nav-item text { font-size: 22rpx; color: #8899bb; }
+.nav-item.active text { color: #2a5cc8; font-weight: 600; }
+.nav-icon { font-size: 40rpx; }
+
+/* ---- 页面标题 ---- */
+.page-title {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #1a3a6e;
+  margin-bottom: 24rpx;
+}
+
+/* ---- 输入框 ---- */
+.field {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 20rpx;
+}
+.field-label {
+  font-size: 26rpx;
+  color: #6880a8;
+  margin-bottom: 8rpx;
+}
+.field input, .field textarea {
+  background: #f4f8ff;
+  border: 1rpx solid #c8d8f0;
+  border-radius: 12rpx;
+  padding: 18rpx 20rpx;
+  font-size: 28rpx;
+  color: #1e3060;
+}
+.field textarea { height: 120rpx; }
+
+/* ---- 选项组 ---- */
+.option-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14rpx;
+  margin-top: 8rpx;
+}
+.option-btn {
+  padding: 12rpx 24rpx;
+  border-radius: 30rpx;
+  font-size: 26rpx;
+  background: #edf3ff;
+  color: #4060a0;
+  border: 2rpx solid transparent;
+}
+.option-btn.selected {
+  background: #2a5cc8;
+  color: #fff;
+  border-color: #2a5cc8;
+}

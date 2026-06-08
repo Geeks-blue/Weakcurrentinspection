@@ -1,0 +1,200 @@
+// pages/student/inspect/inspect.js
+const api = require('../../../utils/api');
+
+Page({
+  data: {
+    assignmentId: null,
+    roomCode: '',
+    buildingName: '',
+    taskTitle: '',
+    floor: '',
+    location: '',
+
+    // 签到方式
+    checkinMode: 'qr',  // 'qr' | 'manual'
+    scannedCode: '',
+    manualCode: '',
+
+    // 巡检项目
+    lockState: 'locked',
+    clutterState: 'none',
+    indicatorState: 'all_ok',
+    assetMatchState: 'matched',
+    remark: '',
+
+    // 照片
+    photos: [],  // [{localPath, key, uploading, error}]
+
+    // 资产台账
+    roomAssets: [],
+    assetsLoading: false,
+    refPhotoUrl: '',
+
+    // 提交
+    submitting: false,
+    submitOk: false,
+    submitError: '',
+
+    // 展开状态
+    showAssets: false,
+  },
+
+  onLoad(options) {
+    this.setData({
+      assignmentId: Number(options.assignmentId),
+      roomCode: decodeURIComponent(options.roomCode || ''),
+      buildingName: decodeURIComponent(options.buildingName || ''),
+      taskTitle: decodeURIComponent(options.taskTitle || ''),
+      floor: decodeURIComponent(options.floor || ''),
+      location: decodeURIComponent(options.location || ''),
+    });
+    wx.setNavigationBarTitle({ title: `巡检·${options.roomCode}` });
+    this.loadRoomData();
+  },
+
+  async loadRoomData() {
+    const roomCode = this.data.roomCode;
+    try {
+      this.setData({ assetsLoading: true });
+      const [assets, refData] = await Promise.allSettled([
+        api.getRoomAssets(roomCode),
+        api.getRoomReferencePhoto(roomCode),
+      ]);
+      this.setData({
+        roomAssets: assets.status === 'fulfilled' ? assets.value : [],
+        refPhotoUrl: refData.status === 'fulfilled' ? (refData.value?.photo_url || '') : '',
+        assetsLoading: false,
+      });
+    } catch (e) {
+      this.setData({ assetsLoading: false });
+    }
+  },
+
+  // ---- QR扫码 ----
+  async onScanQR() {
+    try {
+      const res = await wx.scanCode({ onlyFromCamera: false, scanType: ['qrCode'] });
+      const code = res.result || '';
+      // 提取房间code: 约定二维码内容包含 room_code 或 QR-XXX 格式
+      const roomCode = this.data.roomCode;
+      if (code.includes(roomCode) || code.includes('QR-' + roomCode)) {
+        this.setData({ checkinMode: 'qr', scannedCode: roomCode });
+        wx.showToast({ title: '扫码成功', icon: 'success' });
+      } else {
+        wx.showModal({
+          title: '扫码内容',
+          content: `扫描结果：${code}\n是否使用此代码签到？`,
+          success: (r) => {
+            if (r.confirm) this.setData({ checkinMode: 'qr', scannedCode: code });
+          }
+        });
+      }
+    } catch (e) {
+      if (e.errMsg !== 'scanCode:fail cancel') {
+        wx.showToast({ title: '扫码失败: ' + e.errMsg, icon: 'none' });
+      }
+    }
+  },
+
+  onManualInput(e) { this.setData({ manualCode: e.detail.value }); },
+  switchManual() { this.setData({ checkinMode: 'manual', scannedCode: '' }); },
+  switchQR() { this.setData({ checkinMode: 'qr', manualCode: '' }); },
+
+  // ---- 选项切换 ----
+  setLock(e) { this.setData({ lockState: e.currentTarget.dataset.v }); },
+  setClutter(e) { this.setData({ clutterState: e.currentTarget.dataset.v }); },
+  setIndicator(e) { this.setData({ indicatorState: e.currentTarget.dataset.v }); },
+  setAsset(e) { this.setData({ assetMatchState: e.currentTarget.dataset.v }); },
+  onRemarkInput(e) { this.setData({ remark: e.detail.value }); },
+
+  // ---- 拍照 ----
+  async onTakePhoto() {
+    try {
+      const res = await wx.chooseMedia({
+        count: 3,
+        mediaType: ['image'],
+        sourceType: ['camera', 'album'],
+        camera: 'back',
+      });
+      for (const item of res.tempFiles) {
+        const id = Date.now() + Math.random();
+        const entry = { id, localPath: item.tempFilePath, key: '', uploading: true, error: '' };
+        const photos = [...this.data.photos, entry];
+        this.setData({ photos });
+        this._uploadPhoto(id, item.tempFilePath);
+      }
+    } catch (e) {
+      if (!String(e.errMsg).includes('cancel')) {
+        wx.showToast({ title: '选择照片失败', icon: 'none' });
+      }
+    }
+  },
+
+  async _uploadPhoto(id, localPath) {
+    try {
+      const data = await api.uploadPhoto(localPath, `photo_${Date.now()}.jpg`);
+      this._updatePhoto(id, { key: data.object_key, uploading: false });
+    } catch (e) {
+      this._updatePhoto(id, { uploading: false, error: '上传失败' });
+    }
+  },
+
+  _updatePhoto(id, patch) {
+    const photos = this.data.photos.map(p => p.id === id ? { ...p, ...patch } : p);
+    this.setData({ photos });
+  },
+
+  onDeletePhoto(e) {
+    const id = e.currentTarget.dataset.id;
+    this.setData({ photos: this.data.photos.filter(p => p.id !== id) });
+  },
+
+  onPreviewPhoto(e) {
+    const src = e.currentTarget.dataset.src;
+    wx.previewImage({ urls: [src], current: src });
+  },
+
+  toggleAssets() { this.setData({ showAssets: !this.data.showAssets }); },
+
+  // ---- 提交 ----
+  async onSubmit() {
+    const { assignmentId, checkinMode, scannedCode, manualCode, roomCode,
+            lockState, clutterState, indicatorState, assetMatchState, remark, photos } = this.data;
+
+    if (checkinMode === 'qr' && !scannedCode) {
+      wx.showToast({ title: '请先扫描房间二维码', icon: 'none' }); return;
+    }
+    if (checkinMode === 'manual' && !manualCode.trim()) {
+      wx.showToast({ title: '请输入房间编码', icon: 'none' }); return;
+    }
+    if (photos.some(p => p.uploading)) {
+      wx.showToast({ title: '照片上传中，请稍候', icon: 'none' }); return;
+    }
+
+    const uploadedKeys = photos.filter(p => p.key).map(p => p.key);
+
+    this.setData({ submitting: true, submitError: '' });
+    try {
+      await api.submitInspection({
+        assignment_id: assignmentId,
+        checkin_mode: checkinMode,
+        checkin_lat: 0,
+        checkin_lng: 0,
+        manual_room_code: checkinMode === 'manual' ? manualCode.trim() : undefined,
+        lock_state: lockState,
+        clutter_state: clutterState,
+        indicator_state: indicatorState,
+        asset_match_state: assetMatchState,
+        remark_text: remark || undefined,
+        photo_keys: uploadedKeys,
+      });
+      this.setData({ submitOk: true });
+      wx.showToast({ title: '提交成功', icon: 'success' });
+      setTimeout(() => wx.navigateBack(), 1500);
+    } catch (e) {
+      this.setData({ submitError: e.message || '提交失败' });
+    } finally {
+      this.setData({ submitting: false });
+    }
+  }
+});

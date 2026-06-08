@@ -18,7 +18,8 @@ Page({
       wx.redirectTo({ url: '/pages/login/login' });
       return;
     }
-    this.setData({ username: app.globalData.user?.username || '' });
+    const user = app.globalData.user || {};
+    this.setData({ username: user.username || '' });
     this.load();
   },
 
@@ -31,6 +32,7 @@ Page({
       this.setData({
         items: data.map(r => ({
           ...r,
+          photo_urls: r.photo_urls || [],
           statusLabel: fmt.formatStatus(r.status),
           statusClass: fmt.statusClass(r.status),
           dateStr: fmt.formatDate(r.submitted_at),

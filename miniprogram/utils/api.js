@@ -23,7 +23,7 @@ function request(method, path, data) {
       },
       success(res) {
         if (res.statusCode >= 400) {
-          const detail = res.data?.detail;
+          const detail = res.data && res.data.detail;
           const msg = typeof detail === 'string' ? detail
             : typeof detail === 'object' && detail !== null ? JSON.stringify(detail)
             : `请求失败 (${res.statusCode})`;
@@ -53,7 +53,7 @@ function uploadFile(localPath, filename) {
         try {
           const data = JSON.parse(res.data);
           if (res.statusCode >= 400) {
-            reject(new Error(data?.detail || '上传失败'));
+            reject(new Error((data && data.detail) || '上传失败'));
           } else {
             resolve(data);
           }
@@ -104,12 +104,12 @@ const api = {
 
   // 管理 - 巡检总览
   getConsoleRecords: (params) => {
-    const q = new URLSearchParams();
-    if (params?.status) q.set('status', params.status);
-    if (params?.room_code) q.set('room_code', params.room_code);
-    if (params?.student_username) q.set('student_username', params.student_username);
-    q.set('limit', String(params?.limit ?? 60));
-    return request('GET', `/inspections/console-records?${q.toString()}`);
+    const query = [];
+    if (params && params.status) query.push(`status=${encodeURIComponent(params.status)}`);
+    if (params && params.room_code) query.push(`room_code=${encodeURIComponent(params.room_code)}`);
+    if (params && params.student_username) query.push(`student_username=${encodeURIComponent(params.student_username)}`);
+    query.push(`limit=${encodeURIComponent(String((params && params.limit) || 60))}`);
+    return request('GET', `/inspections/console-records?${query.join('&')}`);
   },
 
   // 管理 - 派发选项

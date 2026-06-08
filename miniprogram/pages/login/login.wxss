@@ -1,49 +1,73 @@
 .login-wrap {
   min-height: 100vh;
-  background: linear-gradient(160deg, #1a3a6e 0%, #2a5cc8 100%);
+  box-sizing: border-box;
+  background:
+    radial-gradient(circle at 12% 10%, #d8e7ff 0%, transparent 38%),
+    radial-gradient(circle at 88% 14%, #dff4ff 0%, transparent 34%),
+    #eef3f9;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 40rpx;
+  padding: 96rpx 40rpx 48rpx;
 }
 .login-card {
   background: #fff;
-  border-radius: 28rpx;
-  padding: 60rpx 48rpx 48rpx;
+  border-radius: 20rpx;
+  padding: 48rpx 48rpx 44rpx;
   width: 100%;
   max-width: 640rpx;
-  box-shadow: 0 12rpx 40rpx rgba(0,0,0,0.18);
+  border: 1rpx solid #cad8ef;
+  box-shadow: 0 20rpx 48rpx rgba(17, 54, 112, 0.14);
 }
-.login-logo { font-size: 80rpx; text-align: center; }
+.login-logo {
+  width: 96rpx;
+  height: 96rpx;
+  margin: 0 auto;
+  border-radius: 28rpx;
+  background: linear-gradient(135deg, #1677ff, #2f88ff);
+  color: #fff;
+  font-size: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .login-title {
   text-align: center;
   font-size: 40rpx;
   font-weight: 700;
-  color: #1a3a6e;
+  color: #13223a;
   margin: 16rpx 0 8rpx;
 }
 .login-sub {
   text-align: center;
   font-size: 26rpx;
-  color: #8899bb;
-  margin-bottom: 40rpx;
+  color: #5e6f86;
+  margin-bottom: 36rpx;
 }
-.login-input {
-  background: #f4f8ff;
-  border: 1rpx solid #c8d8f0;
+.field .login-input {
+  background: #fff;
+  border: 1rpx solid #c6d4ea;
   border-radius: 14rpx;
-  padding: 22rpx 24rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  min-height: 72rpx;
+  padding: 0 24rpx;
   font-size: 28rpx;
-  color: #1e3060;
+  color: #13223a;
   width: 100%;
   box-sizing: border-box;
+}
+.login-placeholder {
+  color: #9aa8ba;
+  font-size: 28rpx;
+  line-height: 72rpx;
 }
 .login-btn { margin-top: 32rpx; width: 100%; }
 .login-hint {
   display: block;
   text-align: center;
   font-size: 22rpx;
-  color: #a0b0cc;
+  color: #5e6f86;
   margin-top: 24rpx;
   line-height: 1.8;
 }

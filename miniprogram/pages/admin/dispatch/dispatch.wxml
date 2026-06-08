@@ -37,16 +37,17 @@
     <input class="search-input" placeholder="搜索房间" value="{{roomFilter}}" bindinput="onRoomFilter" />
     <scroll-view scroll-y style="max-height:400rpx;margin-top:12rpx">
       <view
-        class="sel-item {{selectedRoomIds.includes(item.room_id) ? 'sel-active' : ''}}"
-        wx:for="{{rooms}}"
+        class="sel-item {{item.selected ? 'sel-active' : ''}}"
+        wx:for="{{displayRooms}}"
         wx:key="room_id"
         data-id="{{item.room_id}}"
         bindtap="toggleRoom"
       >
         <text class="sel-code">{{item.room_code}}</text>
-        <text class="sel-sub">{{item.building_name}}</text>
-        <text class="sel-check" wx:if="{{selectedRoomIds.includes(item.room_id)}}">✓</text>
+        <text class="sel-sub">{{item.buildingLabel}}</text>
+        <text class="sel-check" wx:if="{{item.selected}}">✓</text>
       </view>
+      <view class="empty-inline" wx:if="{{displayRooms.length === 0}}">没有匹配的房间</view>
     </scroll-view>
   </view>
 
@@ -55,16 +56,17 @@
     <text class="section-title">选择学生（已选 {{selectedStudentIds.length}} 人）</text>
     <input class="search-input" placeholder="搜索学生" value="{{studentFilter}}" bindinput="onStudentFilter" />
     <view
-      class="sel-item {{selectedStudentIds.includes(item.student_user_id) ? 'sel-active' : ''}}"
-      wx:for="{{students}}"
+      class="sel-item {{item.selected ? 'sel-active' : ''}}"
+      wx:for="{{displayStudents}}"
       wx:key="student_user_id"
       data-id="{{item.student_user_id}}"
       bindtap="toggleStudent"
     >
       <text class="sel-code">{{item.username}}</text>
-      <text class="sel-sub">{{item.gender === 'female' ? '女' : item.gender === 'male' ? '男' : ''}}</text>
-      <text class="sel-check" wx:if="{{selectedStudentIds.includes(item.student_user_id)}}">✓</text>
+      <text class="sel-sub">{{item.genderLabel}}</text>
+      <text class="sel-check" wx:if="{{item.selected}}">✓</text>
     </view>
+    <view class="empty-inline" wx:if="{{displayStudents.length === 0}}">没有匹配的学生</view>
   </view>
 
   <text class="error-tip" wx:if="{{error}}">{{error}}</text>

@@ -9,10 +9,10 @@
     "pages/admin/dispatch/dispatch"
   ],
   "window": {
-    "navigationBarBackgroundColor": "#1a3a6e",
+    "navigationBarBackgroundColor": "#1677ff",
     "navigationBarTextStyle": "white",
     "navigationBarTitleText": "弱电巡检",
-    "backgroundColor": "#f0f4ff",
+    "backgroundColor": "#eef3f9",
     "backgroundTextStyle": "light"
   },
   "usingComponents": {},

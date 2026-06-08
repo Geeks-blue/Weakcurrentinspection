@@ -3,7 +3,7 @@ App({
   globalData: {
     token: '',
     user: null,   // { id, username, role, gender }
-    baseUrl: 'http://your-server-ip:8000'  // ← 修改为实际后端地址
+    baseUrl: 'http://127.0.0.1:18000'  // ← 修改为实际后端地址
   },
 
   onLaunch() {
@@ -30,11 +30,13 @@ App({
   },
 
   isStudent() {
-    return this.globalData.user?.role === 'student';
+    const user = this.globalData.user;
+    return user && user.role === 'student';
   },
 
   isAdmin() {
-    const role = this.globalData.user?.role;
+    const user = this.globalData.user;
+    const role = user && user.role;
     return role === 'admin' || role === 'teacher' || role === 'reviewer';
   }
 });

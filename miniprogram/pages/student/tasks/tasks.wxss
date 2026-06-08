@@ -6,17 +6,17 @@
 }
 .logout-btn {
   font-size: 26rpx;
-  color: #8899bb;
+  color: #5e6f86;
   padding: 8rpx 0;
 }
 .search-wrap { padding: 16rpx 20rpx; margin-bottom: 20rpx; }
 .search-input {
   font-size: 28rpx;
-  color: #1e3060;
+  color: #13223a;
 }
 .loading-tip, .empty-tip {
   text-align: center;
-  color: #8899bb;
+  color: #5e6f86;
   font-size: 28rpx;
   margin-top: 80rpx;
 }
@@ -27,13 +27,13 @@
   justify-content: space-between;
   margin-bottom: 12rpx;
 }
-.task-title { font-size: 30rpx; font-weight: 600; color: #1a3a6e; flex: 1; }
+.task-title { font-size: 30rpx; font-weight: 700; color: #13223a; flex: 1; }
 .task-room {
   display: flex;
   align-items: center;
   gap: 8rpx;
   font-size: 28rpx;
-  color: #2a5cc8;
+  color: #1677ff;
   margin-bottom: 8rpx;
 }
 .room-icon { font-size: 28rpx; }
@@ -43,4 +43,4 @@
   align-items: center;
   margin-top: 8rpx;
 }
-.go-arrow { color: #2a5cc8; font-size: 28rpx; }
+.go-arrow { color: #1677ff; font-size: 28rpx; }

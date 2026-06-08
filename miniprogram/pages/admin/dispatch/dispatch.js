@@ -5,6 +5,8 @@ Page({
   data: {
     rooms: [],
     students: [],
+    displayRooms: [],
+    displayStudents: [],
     loading: false,
     error: '',
     message: '',
@@ -41,6 +43,7 @@ Page({
     try {
       const data = await api.getDispatchOptions();
       this.setData({ rooms: data.rooms || [], students: data.students || [] });
+      this.refreshDisplayLists();
     } catch (e) {
       this.setData({ error: e.message });
     } finally {
@@ -48,11 +51,42 @@ Page({
     }
   },
 
-  get filteredRooms() {
-    const q = this.data.roomFilter.toLowerCase();
-    return q ? this.data.rooms.filter(r =>
-      r.room_code.toLowerCase().includes(q) || r.building_name.toLowerCase().includes(q)
-    ) : this.data.rooms;
+  refreshDisplayLists() {
+    const roomQ = this.data.roomFilter.trim().toLowerCase();
+    const studentQ = this.data.studentFilter.trim().toLowerCase();
+    const selectedRoomMap = this.data.selectedRoomIds.reduce((acc, id) => {
+      acc[id] = true;
+      return acc;
+    }, {});
+    const selectedStudentMap = this.data.selectedStudentIds.reduce((acc, id) => {
+      acc[id] = true;
+      return acc;
+    }, {});
+
+    const displayRooms = this.data.rooms
+      .filter(r => {
+        if (!roomQ) return true;
+        return String(r.room_code || '').toLowerCase().includes(roomQ)
+          || String(r.building_name || r.building_code || '').toLowerCase().includes(roomQ);
+      })
+      .map(r => ({
+        ...r,
+        selected: !!selectedRoomMap[r.room_id],
+        buildingLabel: r.building_name || r.building_code || '',
+      }));
+
+    const displayStudents = this.data.students
+      .filter(s => {
+        if (!studentQ) return true;
+        return String(s.username || '').toLowerCase().includes(studentQ);
+      })
+      .map(s => ({
+        ...s,
+        selected: !!selectedStudentMap[s.student_user_id],
+        genderLabel: s.gender === 'female' ? '女' : s.gender === 'male' ? '男' : '未设置',
+      }));
+
+    this.setData({ displayRooms, displayStudents });
   },
 
   toggleRoom(e) {
@@ -61,6 +95,7 @@ Page({
     this.setData({
       selectedRoomIds: sel.includes(id) ? sel.filter(x => x !== id) : [...sel, id]
     });
+    this.refreshDisplayLists();
   },
 
   toggleStudent(e) {
@@ -69,23 +104,25 @@ Page({
     this.setData({
       selectedStudentIds: sel.includes(id) ? sel.filter(x => x !== id) : [...sel, id]
     });
+    this.refreshDisplayLists();
   },
 
-  onRoomFilter(e) { this.setData({ roomFilter: e.detail.value }); },
-  onStudentFilter(e) { this.setData({ studentFilter: e.detail.value }); },
+  onRoomFilter(e) { this.setData({ roomFilter: e.detail.value }); this.refreshDisplayLists(); },
+  onStudentFilter(e) { this.setData({ studentFilter: e.detail.value }); this.refreshDisplayLists(); },
   onTitleInput(e) { this.setData({ taskTitle: e.detail.value }); },
   onDueDateChange(e) { this.setData({ dueDate: e.detail.value }); },
   onCycleChange(e) { this.setData({ cycleType: this.data.cycleOptions[e.detail.value] }); },
 
   selectAllRooms() {
-    const q = this.data.roomFilter.toLowerCase();
+    const q = this.data.roomFilter.trim().toLowerCase();
     const visible = q
-      ? this.data.rooms.filter(r => r.room_code.toLowerCase().includes(q) || r.building_name.toLowerCase().includes(q))
+      ? this.data.rooms.filter(r => String(r.room_code || '').toLowerCase().includes(q) || String(r.building_name || r.building_code || '').toLowerCase().includes(q))
       : this.data.rooms;
     const ids = visible.map(r => r.room_id);
     this.setData({ selectedRoomIds: [...new Set([...this.data.selectedRoomIds, ...ids])] });
+    this.refreshDisplayLists();
   },
-  clearRooms() { this.setData({ selectedRoomIds: [] }); },
+  clearRooms() { this.setData({ selectedRoomIds: [] }); this.refreshDisplayLists(); },
 
   async onDispatch() {
     const { taskTitle, selectedRoomIds, selectedStudentIds, cycleType, dueDate } = this.data;
@@ -110,8 +147,14 @@ Page({
       const bk = room.building_code;
       const gender = room.gender_restriction || 'none';
       let pool = stuIds;
-      if (gender === 'female') pool = stuIds.filter(id => students.find(s => s.student_user_id === id)?.gender === 'female');
-      else if (gender === 'male') pool = stuIds.filter(id => students.find(s => s.student_user_id === id)?.gender === 'male');
+      if (gender === 'female') pool = stuIds.filter(id => {
+        const student = students.find(s => s.student_user_id === id);
+        return student && student.gender === 'female';
+      });
+      else if (gender === 'male') pool = stuIds.filter(id => {
+        const student = students.find(s => s.student_user_id === id);
+        return student && student.gender === 'male';
+      });
       if (!pool.length) continue;
       const preferred = buildingStu.get(bk);
       const sid = (preferred && pool.includes(preferred))
@@ -120,6 +163,11 @@ Page({
       counts.set(sid, (counts.get(sid) || 0) + 1);
       if (!buildingStu.has(bk)) buildingStu.set(bk, sid);
       assignments.push({ room_id: room.room_id, student_user_id: sid });
+    }
+
+    if (!assignments.length) {
+      wx.showToast({ title: '没有可派发的匹配组合', icon: 'none' });
+      return;
     }
 
     this.setData({ dispatching: true, error: '', message: '' });
@@ -138,6 +186,7 @@ Page({
         selectedRoomIds: [],
         selectedStudentIds: [],
       });
+      this.refreshDisplayLists();
       wx.showToast({ title: `派发${assignments.length}个任务`, icon: 'success' });
     } catch (e) {
       this.setData({ error: e.message });

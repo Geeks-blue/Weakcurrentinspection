@@ -24,6 +24,7 @@ Page({
       this.setData({
         records: data.map(r => ({
           ...r,
+          photo_urls: r.photo_urls || [],
           statusLabel: fmt.formatStatus(r.status),
           statusClass: fmt.statusClass(r.status),
           dateStr: fmt.formatDate(r.submitted_at),
@@ -45,5 +46,5 @@ Page({
     wx.previewImage({ urls, current });
   },
 
-  goTasks() { wx.navigateBack(); }
+  goTasks() { wx.redirectTo({ url: '/pages/student/tasks/tasks' }); }
 });

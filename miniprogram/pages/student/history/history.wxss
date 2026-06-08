@@ -1,5 +1,5 @@
-.loading-tip, .empty-tip { text-align:center; color:#8899bb; font-size:28rpx; margin-top:80rpx; }
+.loading-tip, .empty-tip { text-align:center; color:#5e6f86; font-size:28rpx; margin-top:80rpx; }
 .rec-head { display:flex; align-items:flex-start; justify-content:space-between; }
-.rec-room { font-size:30rpx; font-weight:600; color:#1a3a6e; display:block; margin-bottom:4rpx; }
+.rec-room { font-size:30rpx; font-weight:700; color:#13223a; display:block; margin-bottom:4rpx; }
 .photo-strip { display:flex; flex-wrap:wrap; gap:12rpx; margin-top:12rpx; }
 .photo-thumb { width:140rpx; height:110rpx; border-radius:10rpx; }

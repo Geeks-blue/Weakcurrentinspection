@@ -54,26 +54,62 @@ Page({
 
   async loadRoomData() {
     const roomCode = this.data.roomCode;
+    this.setData({ assetsLoading: true });
     try {
-      this.setData({ assetsLoading: true });
-      const [assets, refData] = await Promise.allSettled([
-        api.getRoomAssets(roomCode),
-        api.getRoomReferencePhoto(roomCode),
-      ]);
-      this.setData({
-        roomAssets: assets.status === 'fulfilled' ? assets.value : [],
-        refPhotoUrl: refData.status === 'fulfilled' ? (refData.value?.photo_url || '') : '',
-        assetsLoading: false,
-      });
+      const assets = await api.getRoomAssets(roomCode);
+      this.setData({ roomAssets: assets || [] });
     } catch (e) {
+      this.setData({ roomAssets: [] });
+    }
+    try {
+      const refData = await api.getRoomReferencePhoto(roomCode);
+      this.setData({ refPhotoUrl: (refData && refData.photo_url) || '' });
+    } catch (e) {
+      this.setData({ refPhotoUrl: '' });
+    } finally {
       this.setData({ assetsLoading: false });
     }
+  },
+
+  scanCode() {
+    return new Promise((resolve, reject) => {
+      wx.scanCode({
+        onlyFromCamera: false,
+        scanType: ['qrCode'],
+        success: resolve,
+        fail: reject,
+      });
+    });
+  },
+
+  chooseImages() {
+    return new Promise((resolve, reject) => {
+      if (wx.chooseMedia) {
+        wx.chooseMedia({
+          count: 3,
+          mediaType: ['image'],
+          sourceType: ['camera', 'album'],
+          camera: 'back',
+          success: resolve,
+          fail: reject,
+        });
+        return;
+      }
+      wx.chooseImage({
+        count: 3,
+        sourceType: ['camera', 'album'],
+        success(res) {
+          resolve({ tempFiles: (res.tempFilePaths || []).map(path => ({ tempFilePath: path })) });
+        },
+        fail: reject,
+      });
+    });
   },
 
   // ---- QR扫码 ----
   async onScanQR() {
     try {
-      const res = await wx.scanCode({ onlyFromCamera: false, scanType: ['qrCode'] });
+      const res = await this.scanCode();
       const code = res.result || '';
       // 提取房间code: 约定二维码内容包含 room_code 或 QR-XXX 格式
       const roomCode = this.data.roomCode;
@@ -110,12 +146,7 @@ Page({
   // ---- 拍照 ----
   async onTakePhoto() {
     try {
-      const res = await wx.chooseMedia({
-        count: 3,
-        mediaType: ['image'],
-        sourceType: ['camera', 'album'],
-        camera: 'back',
-      });
+      const res = await this.chooseImages();
       for (const item of res.tempFiles) {
         const id = Date.now() + Math.random();
         const entry = { id, localPath: item.tempFilePath, key: '', uploading: true, error: '' };
@@ -172,6 +203,9 @@ Page({
     }
 
     const uploadedKeys = photos.filter(p => p.key).map(p => p.key);
+    if (checkinMode === 'manual' && uploadedKeys.length === 0) {
+      wx.showToast({ title: '手动签到请先上传门牌照片', icon: 'none' }); return;
+    }
 
     this.setData({ submitting: true, submitError: '' });
     try {
@@ -181,6 +215,7 @@ Page({
         checkin_lat: 0,
         checkin_lng: 0,
         manual_room_code: checkinMode === 'manual' ? manualCode.trim() : undefined,
+        door_plate_photo_key: checkinMode === 'manual' ? uploadedKeys[0] : undefined,
         lock_state: lockState,
         clutter_state: clutterState,
         indicator_state: indicatorState,

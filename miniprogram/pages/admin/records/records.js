@@ -12,7 +12,7 @@ Page({
     filterStudent: '',
     statusOptions: [
       { label: '全部', value: '' },
-      { label: '待审核', value: 'submitted' },
+      { label: '待审核', value: 'pending_review' },
       { label: '已通过', value: 'approved' },
       { label: '驳回', value: 'rejected' },
       { label: '需整改', value: 'rectify_required' },
@@ -39,11 +39,14 @@ Page({
       this.setData({
         records: data.map(r => ({
           ...r,
+          photo_urls: r.photo_urls || [],
           statusLabel: fmt.formatStatus(r.status),
           statusClass: fmt.statusClass(r.status),
           dateStr: fmt.formatDateShort(r.submitted_at),
           lockLabel: fmt.formatLock(r.lock_state),
+          clutterLabel: fmt.formatClutter(r.clutter_state),
           indicatorLabel: fmt.formatIndicator(r.indicator_state),
+          assetLabel: fmt.formatAssetMatch(r.asset_match_state),
         }))
       });
     } catch (e) {
@@ -70,5 +73,6 @@ Page({
     wx.previewImage({ urls: e.currentTarget.dataset.urls, current: e.currentTarget.dataset.current });
   },
 
-  goBack() { wx.navigateBack(); }
+  goBack() { wx.navigateBack(); },
+  goDispatch() { wx.navigateTo({ url: '/pages/admin/dispatch/dispatch' }); }
 });

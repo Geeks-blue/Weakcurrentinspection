@@ -5,6 +5,7 @@ const STATUS_LABEL = {
   in_progress: '进行中',
   done: '已完成',
   submitted: '已提交',
+  pending_review: '待审核',
   approved: '已通过',
   rejected: '已驳回',
   rectify_required: '需整改',
@@ -14,6 +15,7 @@ const STATUS_LABEL = {
 const STATUS_CLASS = {
   todo: 'badge-pending',
   submitted: 'badge-submitted',
+  pending_review: 'badge-pending',
   approved: 'badge-approved',
   rejected: 'badge-rejected',
   rectify_required: 'badge-rectify',

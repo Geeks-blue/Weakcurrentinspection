@@ -8,6 +8,7 @@
       <text class="field-label">用户名</text>
       <input
         class="login-input"
+        placeholder-class="login-placeholder"
         placeholder="请输入用户名"
         value="{{username}}"
         bindinput="onInputUsername"
@@ -19,6 +20,7 @@
       <text class="field-label">密码</text>
       <input
         class="login-input"
+        placeholder-class="login-placeholder"
         placeholder="请输入密码"
         password
         value="{{password}}"

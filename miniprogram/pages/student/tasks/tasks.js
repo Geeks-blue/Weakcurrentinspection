@@ -18,7 +18,8 @@ Page({
       wx.redirectTo({ url: '/pages/login/login' });
       return;
     }
-    this.setData({ username: app.globalData.user?.username || '' });
+    const user = app.globalData.user || {};
+    this.setData({ username: user.username || '' });
     this.loadTasks();
   },
 
@@ -62,13 +63,26 @@ Page({
   },
 
   onTaskTap(e) {
-    const task = e.currentTarget.dataset.task;
+    const id = Number(e.currentTarget.dataset.id);
+    const task = this.data.tasks.find(t => t.assignment_id === id);
+    if (!task) {
+      wx.showToast({ title: '任务不存在，请刷新', icon: 'none' });
+      return;
+    }
     if (task.status === 'done' || task.status === 'approved') {
       wx.showToast({ title: '该任务已完成', icon: 'none' });
       return;
     }
+    const params = [
+      `assignmentId=${encodeURIComponent(task.assignment_id)}`,
+      `roomCode=${encodeURIComponent(task.room_code || '')}`,
+      `buildingName=${encodeURIComponent(task.building_name || task.building_code || '')}`,
+      `taskTitle=${encodeURIComponent(task.task_title || '')}`,
+      `floor=${encodeURIComponent(task.floor_label || '')}`,
+      `location=${encodeURIComponent(task.location_text || '')}`,
+    ].join('&');
     wx.navigateTo({
-      url: `/pages/student/inspect/inspect?assignmentId=${task.assignment_id}&roomCode=${task.room_code}&buildingName=${task.building_name}&taskTitle=${task.task_title}&floor=${task.floor_label||''}&location=${task.location_text||''}`
+      url: `/pages/student/inspect/inspect?${params}`
     });
   },
 

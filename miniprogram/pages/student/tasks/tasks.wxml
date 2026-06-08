@@ -31,7 +31,7 @@
     class="task-card card"
     wx:for="{{filteredTasks}}"
     wx:key="assignment_id"
-    data-task="{{item}}"
+    data-id="{{item.assignment_id}}"
     bindtap="onTaskTap"
   >
     <view class="task-head">

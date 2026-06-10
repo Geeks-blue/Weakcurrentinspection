@@ -12,21 +12,24 @@ function getToken() {
 function request(method, path, data) {
   const url = getBaseUrl() + path;
   const token = getToken();
-  return new Promise((resolve, reject) => {
+  return new Promise(function (resolve, reject) {
+    const header = {
+      'Content-Type': 'application/json'
+    };
+    if (token) {
+      header.Authorization = 'Bearer ' + token;
+    }
     wx.request({
-      url,
-      method,
-      data,
-      header: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
-      },
+      url: url,
+      method: method,
+      data: data,
+      header: header,
       success(res) {
         if (res.statusCode >= 400) {
           const detail = res.data && res.data.detail;
           const msg = typeof detail === 'string' ? detail
             : typeof detail === 'object' && detail !== null ? JSON.stringify(detail)
-            : `请求失败 (${res.statusCode})`;
+            : '请求失败 (' + res.statusCode + ')';
           reject(new Error(msg));
         } else {
           resolve(res.data);
@@ -42,12 +45,12 @@ function request(method, path, data) {
 function uploadFile(localPath, filename) {
   const url = getBaseUrl() + '/inspections/photos/upload';
   const token = getToken();
-  return new Promise((resolve, reject) => {
+  return new Promise(function (resolve, reject) {
     wx.uploadFile({
       url,
       filePath: localPath,
       name: 'file',
-      header: { Authorization: `Bearer ${token}` },
+      header: { Authorization: 'Bearer ' + token },
       formData: { filename },
       success(res) {
         try {
@@ -70,59 +73,64 @@ function uploadFile(localPath, filename) {
 
 const api = {
   // 认证
-  login: (username, password) =>
-    request('POST', '/auth/login', { username, password }),
-  getMe: () => request('GET', '/auth/me'),
+  login: function (username, password) {
+    return request('POST', '/auth/login', { username: username, password: password });
+  },
+  getMe: function () { return request('GET', '/auth/me'); },
 
   // 学生 - 任务
-  getMyTasks: () => request('GET', '/tasks/my'),
+  getMyTasks: function () { return request('GET', '/tasks/my'); },
 
   // 学生 - 巡检提交
-  submitInspection: (payload) =>
-    request('POST', '/inspections/submit', payload),
+  submitInspection: function (payload) {
+    return request('POST', '/inspections/submit', payload);
+  },
 
   // 学生 - 历史记录
-  getMyInspections: () => request('GET', '/inspections/my'),
+  getMyInspections: function () { return request('GET', '/inspections/my'); },
 
   // 学生 - 房间资产
-  getRoomAssets: (roomCode) =>
-    request('GET', `/assets/room-assets/${encodeURIComponent(roomCode)}`),
+  getRoomAssets: function (roomCode) {
+    return request('GET', '/assets/room-assets/' + encodeURIComponent(roomCode));
+  },
 
   // 学生 - 参考照片
-  getRoomReferencePhoto: (roomCode) =>
-    request('GET', `/inspections/room-reference-photo?room_code=${encodeURIComponent(roomCode)}`),
+  getRoomReferencePhoto: function (roomCode) {
+    return request('GET', '/inspections/room-reference-photo?room_code=' + encodeURIComponent(roomCode));
+  },
 
   // 照片上传
-  uploadPhoto: (localPath, filename) => uploadFile(localPath, filename),
-  getPhotoUrl: (objectKey) => getBaseUrl() + `/inspections/photos/${objectKey}`,
+  uploadPhoto: function (localPath, filename) { return uploadFile(localPath, filename); },
+  getPhotoUrl: function (objectKey) { return getBaseUrl() + '/inspections/photos/' + objectKey; },
 
   // 管理 - 待审核
-  getPendingReview: () => request('GET', '/inspections/pending-review'),
-  reviewInspection: (id, action, reason) =>
-    request('POST', `/inspections/${id}/review`, { action, reason }),
-  deleteInspection: (id) => request('DELETE', `/inspections/${id}`),
+  getPendingReview: function () { return request('GET', '/inspections/pending-review'); },
+  reviewInspection: function (id, action, reason) {
+    return request('POST', '/inspections/' + id + '/review', { action: action, reason: reason });
+  },
+  deleteInspection: function (id) { return request('DELETE', '/inspections/' + id); },
 
   // 管理 - 巡检总览
-  getConsoleRecords: (params) => {
+  getConsoleRecords: function (params) {
     const query = [];
-    if (params && params.status) query.push(`status=${encodeURIComponent(params.status)}`);
-    if (params && params.room_code) query.push(`room_code=${encodeURIComponent(params.room_code)}`);
-    if (params && params.student_username) query.push(`student_username=${encodeURIComponent(params.student_username)}`);
-    query.push(`limit=${encodeURIComponent(String((params && params.limit) || 60))}`);
-    return request('GET', `/inspections/console-records?${query.join('&')}`);
+    if (params && params.status) query.push('status=' + encodeURIComponent(params.status));
+    if (params && params.room_code) query.push('room_code=' + encodeURIComponent(params.room_code));
+    if (params && params.student_username) query.push('student_username=' + encodeURIComponent(params.student_username));
+    query.push('limit=' + encodeURIComponent(String((params && params.limit) || 60)));
+    return request('GET', '/inspections/console-records?' + query.join('&'));
   },
 
   // 管理 - 派发选项
-  getDispatchOptions: () => request('GET', '/tasks/dispatch-options'),
+  getDispatchOptions: function () { return request('GET', '/tasks/dispatch-options'); },
 
   // 管理 - 创建任务
-  createAssignment: (payload) => request('POST', '/tasks/assign', payload),
+  createAssignment: function (payload) { return request('POST', '/tasks/assign', payload); },
 
   // 管理 - 待处理任务列表
-  getPendingTasks: () => request('GET', '/tasks/pending'),
+  getPendingTasks: function () { return request('GET', '/tasks/pending'); },
 
   // 管理 - 删除任务
-  deleteTask: (id) => request('DELETE', `/tasks/${id}`),
+  deleteTask: function (id) { return request('DELETE', '/tasks/' + id); },
 };
 
 module.exports = api;

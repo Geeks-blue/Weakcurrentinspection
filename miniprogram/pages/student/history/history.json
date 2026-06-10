@@ -1,1 +1,9 @@
-{ "navigationBarTitleText": "巡检记录" }
+{
+  "navigationBarTitleText": "巡检记录",
+  "usingComponents": {
+    "bottom-nav": "/components/bottom-nav/bottom-nav"
+  },
+  "componentPlaceholder": {
+    "bottom-nav": "view"
+  }
+}

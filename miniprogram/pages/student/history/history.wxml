@@ -17,7 +17,7 @@
     <view class="label-row"><text>杂物</text><text>{{item.clutterLabel}}</text></view>
     <view class="label-row"><text>指示灯</text><text>{{item.indicatorLabel}}</text></view>
     <view class="label-row"><text>资产</text><text>{{item.assetLabel}}</text></view>
-    <view class="photo-strip" wx:if="{{item.photo_urls.length > 0}}">
+    <view class="photo-strip" wx:if="{{item.hasPhotos}}">
       <image
         wx:for="{{item.photo_urls}}"
         wx:for-item="url"
@@ -25,22 +25,12 @@
         src="{{url}}"
         mode="aspectFill"
         class="photo-thumb"
-        data-urls="{{item.photo_urls}}"
+        data-id="{{item.inspection_id}}"
         data-current="{{url}}"
         bindtap="onPreviewPhoto"
       />
     </view>
   </view>
 
-  <!-- 底部导航 -->
-  <view class="nav-bar">
-    <view class="nav-item" bindtap="goTasks">
-      <text class="nav-icon">📋</text>
-      <text>任务</text>
-    </view>
-    <view class="nav-item active">
-      <text class="nav-icon">📁</text>
-      <text>记录</text>
-    </view>
-  </view>
+  <bottom-nav role="student" current="history" />
 </view>

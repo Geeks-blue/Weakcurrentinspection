@@ -48,7 +48,7 @@ Page({
       floor: decodeURIComponent(options.floor || ''),
       location: decodeURIComponent(options.location || ''),
     });
-    wx.setNavigationBarTitle({ title: `巡检·${options.roomCode}` });
+    wx.setNavigationBarTitle({ title: '巡检·' + (options.roomCode || '') });
     this.loadRoomData();
   },
 
@@ -72,7 +72,7 @@ Page({
   },
 
   scanCode() {
-    return new Promise((resolve, reject) => {
+    return new Promise(function (resolve, reject) {
       wx.scanCode({
         onlyFromCamera: false,
         scanType: ['qrCode'],
@@ -83,7 +83,7 @@ Page({
   },
 
   chooseImages() {
-    return new Promise((resolve, reject) => {
+    return new Promise(function (resolve, reject) {
       if (wx.chooseMedia) {
         wx.chooseMedia({
           count: 3,
@@ -99,7 +99,12 @@ Page({
         count: 3,
         sourceType: ['camera', 'album'],
         success(res) {
-          resolve({ tempFiles: (res.tempFilePaths || []).map(path => ({ tempFilePath: path })) });
+          const tempFiles = [];
+          const paths = res.tempFilePaths || [];
+          for (let i = 0; i < paths.length; i += 1) {
+            tempFiles.push({ tempFilePath: paths[i] });
+          }
+          resolve({ tempFiles: tempFiles });
         },
         fail: reject,
       });
@@ -113,15 +118,16 @@ Page({
       const code = res.result || '';
       // 提取房间code: 约定二维码内容包含 room_code 或 QR-XXX 格式
       const roomCode = this.data.roomCode;
-      if (code.includes(roomCode) || code.includes('QR-' + roomCode)) {
+      if (code.indexOf(roomCode) !== -1 || code.indexOf('QR-' + roomCode) !== -1) {
         this.setData({ checkinMode: 'qr', scannedCode: roomCode });
         wx.showToast({ title: '扫码成功', icon: 'success' });
       } else {
+        const that = this;
         wx.showModal({
           title: '扫码内容',
-          content: `扫描结果：${code}\n是否使用此代码签到？`,
-          success: (r) => {
-            if (r.confirm) this.setData({ checkinMode: 'qr', scannedCode: code });
+          content: '扫描结果：' + code + '\n是否使用此代码签到？',
+          success(r) {
+            if (r.confirm) that.setData({ checkinMode: 'qr', scannedCode: code });
           }
         });
       }
@@ -147,15 +153,18 @@ Page({
   async onTakePhoto() {
     try {
       const res = await this.chooseImages();
-      for (const item of res.tempFiles) {
+      const tempFiles = (res && res.tempFiles) || [];
+      for (let i = 0; i < tempFiles.length; i += 1) {
+        const item = tempFiles[i];
         const id = Date.now() + Math.random();
         const entry = { id, localPath: item.tempFilePath, key: '', uploading: true, error: '' };
-        const photos = [...this.data.photos, entry];
+        const photos = this.data.photos.slice();
+        photos.push(entry);
         this.setData({ photos });
         this._uploadPhoto(id, item.tempFilePath);
       }
     } catch (e) {
-      if (!String(e.errMsg).includes('cancel')) {
+      if (String(e.errMsg).indexOf('cancel') === -1) {
         wx.showToast({ title: '选择照片失败', icon: 'none' });
       }
     }
@@ -163,7 +172,7 @@ Page({
 
   async _uploadPhoto(id, localPath) {
     try {
-      const data = await api.uploadPhoto(localPath, `photo_${Date.now()}.jpg`);
+      const data = await api.uploadPhoto(localPath, 'photo_' + Date.now() + '.jpg');
       this._updatePhoto(id, { key: data.object_key, uploading: false });
     } catch (e) {
       this._updatePhoto(id, { uploading: false, error: '上传失败' });
@@ -171,13 +180,33 @@ Page({
   },
 
   _updatePhoto(id, patch) {
-    const photos = this.data.photos.map(p => p.id === id ? { ...p, ...patch } : p);
+    const photos = [];
+    for (let i = 0; i < this.data.photos.length; i += 1) {
+      const p = this.data.photos[i];
+      if (p.id === id) {
+        photos.push({
+          id: p.id,
+          localPath: p.localPath,
+          key: patch.key !== undefined ? patch.key : p.key,
+          uploading: patch.uploading !== undefined ? patch.uploading : p.uploading,
+          error: patch.error !== undefined ? patch.error : p.error,
+        });
+      } else {
+        photos.push(p);
+      }
+    }
     this.setData({ photos });
   },
 
   onDeletePhoto(e) {
     const id = e.currentTarget.dataset.id;
-    this.setData({ photos: this.data.photos.filter(p => p.id !== id) });
+    const photos = [];
+    for (let i = 0; i < this.data.photos.length; i += 1) {
+      if (this.data.photos[i].id !== id) {
+        photos.push(this.data.photos[i]);
+      }
+    }
+    this.setData({ photos: photos });
   },
 
   onPreviewPhoto(e) {
@@ -189,8 +218,16 @@ Page({
 
   // ---- 提交 ----
   async onSubmit() {
-    const { assignmentId, checkinMode, scannedCode, manualCode, roomCode,
-            lockState, clutterState, indicatorState, assetMatchState, remark, photos } = this.data;
+    const assignmentId = this.data.assignmentId;
+    const checkinMode = this.data.checkinMode;
+    const scannedCode = this.data.scannedCode;
+    const manualCode = this.data.manualCode;
+    const lockState = this.data.lockState;
+    const clutterState = this.data.clutterState;
+    const indicatorState = this.data.indicatorState;
+    const assetMatchState = this.data.assetMatchState;
+    const remark = this.data.remark;
+    const photos = this.data.photos;
 
     if (checkinMode === 'qr' && !scannedCode) {
       wx.showToast({ title: '请先扫描房间二维码', icon: 'none' }); return;
@@ -198,11 +235,15 @@ Page({
     if (checkinMode === 'manual' && !manualCode.trim()) {
       wx.showToast({ title: '请输入房间编码', icon: 'none' }); return;
     }
-    if (photos.some(p => p.uploading)) {
-      wx.showToast({ title: '照片上传中，请稍候', icon: 'none' }); return;
+    const uploadedKeys = [];
+    for (let i = 0; i < photos.length; i += 1) {
+      if (photos[i].uploading) {
+        wx.showToast({ title: '照片上传中，请稍候', icon: 'none' }); return;
+      }
+      if (photos[i].key) {
+        uploadedKeys.push(photos[i].key);
+      }
     }
-
-    const uploadedKeys = photos.filter(p => p.key).map(p => p.key);
     if (checkinMode === 'manual' && uploadedKeys.length === 0) {
       wx.showToast({ title: '手动签到请先上传门牌照片', icon: 'none' }); return;
     }
@@ -225,7 +266,9 @@ Page({
       });
       this.setData({ submitOk: true });
       wx.showToast({ title: '提交成功', icon: 'success' });
-      setTimeout(() => wx.navigateBack(), 1500);
+      setTimeout(function () {
+        wx.redirectTo({ url: '/pages/student/tasks/tasks' });
+      }, 1500);
     } catch (e) {
       this.setData({ submitError: e.message || '提交失败' });
     } finally {

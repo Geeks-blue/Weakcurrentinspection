@@ -1,1 +1,9 @@
-{ "navigationBarTitleText": "待审核" }
+{
+  "navigationBarTitleText": "待审核",
+  "usingComponents": {
+    "bottom-nav": "/components/bottom-nav/bottom-nav"
+  },
+  "componentPlaceholder": {
+    "bottom-nav": "view"
+  }
+}

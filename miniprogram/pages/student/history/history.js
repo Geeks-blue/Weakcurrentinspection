@@ -21,10 +21,26 @@ Page({
     this.setData({ loading: true, error: '' });
     try {
       const data = await api.getMyInspections();
-      this.setData({
-        records: data.map(r => ({
-          ...r,
+      const records = [];
+      for (let i = 0; i < data.length; i += 1) {
+        const r = data[i];
+        records.push({
+          inspection_id: r.inspection_id,
+          assignment_id: r.assignment_id,
+          building_code: r.building_code,
+          building_name: r.building_name,
+          room_code: r.room_code,
+          submitted_at: r.submitted_at,
+          status: r.status,
+          checkin_mode: r.checkin_mode,
+          manual_room_code: r.manual_room_code,
+          lock_state: r.lock_state,
+          clutter_state: r.clutter_state,
+          indicator_state: r.indicator_state,
+          asset_match_state: r.asset_match_state,
+          remark_text: r.remark_text,
           photo_urls: r.photo_urls || [],
+          hasPhotos: !!(r.photo_urls && r.photo_urls.length),
           statusLabel: fmt.formatStatus(r.status),
           statusClass: fmt.statusClass(r.status),
           dateStr: fmt.formatDate(r.submitted_at),
@@ -32,8 +48,9 @@ Page({
           clutterLabel: fmt.formatClutter(r.clutter_state),
           indicatorLabel: fmt.formatIndicator(r.indicator_state),
           assetLabel: fmt.formatAssetMatch(r.asset_match_state),
-        }))
-      });
+        });
+      }
+      this.setData({ records: records });
     } catch (e) {
       this.setData({ error: e.message });
     } finally {
@@ -42,9 +59,18 @@ Page({
   },
 
   onPreviewPhoto(e) {
-    const { urls, current } = e.currentTarget.dataset;
-    wx.previewImage({ urls, current });
+    const id = Number(e.currentTarget.dataset.id);
+    const current = e.currentTarget.dataset.current;
+    const urls = this.findPhotoUrls(id);
+    wx.previewImage({ urls: urls, current: current });
   },
 
-  goTasks() { wx.redirectTo({ url: '/pages/student/tasks/tasks' }); }
+  findPhotoUrls(id) {
+    for (let i = 0; i < this.data.records.length; i += 1) {
+      if (this.data.records[i].inspection_id === id) {
+        return this.data.records[i].photo_urls || [];
+      }
+    }
+    return [];
+  }
 });

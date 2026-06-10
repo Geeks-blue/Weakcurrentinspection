@@ -3,7 +3,7 @@ App({
   globalData: {
     token: '',
     user: null,   // { id, username, role, gender }
-    baseUrl: 'http://127.0.0.1:18000'  // ← 修改为实际后端地址
+    baseUrl: 'https://rdj-268749-4-1308736108.sh.run.tcloudbase.com'
   },
 
   onLaunch() {

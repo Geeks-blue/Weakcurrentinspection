@@ -1,1 +1,9 @@
-{ "navigationBarTitleText": "派发任务" }
+{
+  "navigationBarTitleText": "派发任务",
+  "usingComponents": {
+    "bottom-nav": "/components/bottom-nav/bottom-nav"
+  },
+  "componentPlaceholder": {
+    "bottom-nav": "view"
+  }
+}

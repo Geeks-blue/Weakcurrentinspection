@@ -13,8 +13,8 @@
     </view>
     <view class="field">
       <text class="field-label">巡检周期</text>
-      <picker mode="selector" range="{{cycleLabels}}" bindchange="onCycleChange">
-        <view class="d-input picker-val">{{cycleLabels[cycleOptions.indexOf(cycleType)]}} ▾</view>
+      <picker mode="selector" range="{{cycleLabels}}" value="{{cycleIndex}}" bindchange="onCycleChange">
+        <view class="d-input picker-val">{{cycleLabel}} ▾</view>
       </picker>
     </view>
     <view class="field">
@@ -79,17 +79,6 @@
     bindtap="onDispatch"
   >{{dispatching ? '派发中...' : '🚀 一键均分派发'}}</button>
 
-  <!-- 底部导航 -->
-  <view class="nav-bar">
-    <view class="nav-item" bindtap="goBack">
-      <text class="nav-icon">📝</text><text>待审核</text>
-    </view>
-    <view class="nav-item">
-      <text class="nav-icon">📊</text><text>记录总览</text>
-    </view>
-    <view class="nav-item active">
-      <text class="nav-icon">📤</text><text>派发任务</text>
-    </view>
-  </view>
+  <bottom-nav role="admin" current="dispatch" />
 </view>
 </scroll-view>

@@ -35,7 +35,7 @@
         <text>备注</text><text>{{item.remark_text}}</text>
       </view>
 
-      <view class="photo-strip" wx:if="{{item.photo_urls && item.photo_urls.length > 0}}">
+      <view class="photo-strip" wx:if="{{item.hasPhotos}}">
         <image
           wx:for="{{item.photo_urls}}"
           wx:for-item="url"
@@ -43,7 +43,7 @@
           src="{{url}}"
           mode="aspectFill"
           class="photo-thumb"
-          data-urls="{{item.photo_urls}}"
+          data-id="{{item.inspection_id}}"
           data-current="{{url}}"
           bindtap="onPreviewPhoto"
         />
@@ -74,19 +74,5 @@
     </view>
   </view>
 
-  <!-- 底部导航 -->
-  <view class="nav-bar">
-    <view class="nav-item active">
-      <text class="nav-icon">📝</text>
-      <text>待审核</text>
-    </view>
-    <view class="nav-item" bindtap="goRecords">
-      <text class="nav-icon">📊</text>
-      <text>记录总览</text>
-    </view>
-    <view class="nav-item" bindtap="goDispatch">
-      <text class="nav-icon">📤</text>
-      <text>派发任务</text>
-    </view>
-  </view>
+  <bottom-nav role="admin" current="review" />
 </view>

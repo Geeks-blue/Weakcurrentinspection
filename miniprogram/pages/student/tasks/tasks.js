@@ -23,18 +23,28 @@ Page({
     this.loadTasks();
   },
 
-  onShow() { this.loadTasks(); },
-
   async loadTasks() {
     this.setData({ loading: true, error: '' });
     try {
       const tasks = await api.getMyTasks();
-      const enriched = tasks.map(t => ({
-        ...t,
-        statusLabel: fmt.formatStatus(t.status),
-        statusClass: fmt.statusClass(t.status),
-        dueDateShort: fmt.formatDateShort(t.due_at),
-      }));
+      const enriched = [];
+      for (let i = 0; i < tasks.length; i += 1) {
+        const t = tasks[i];
+        enriched.push({
+          assignment_id: t.assignment_id,
+          task_title: t.task_title,
+          building_code: t.building_code,
+          building_name: t.building_name,
+          room_code: t.room_code,
+          floor_label: t.floor_label,
+          location_text: t.location_text,
+          due_at: t.due_at,
+          status: t.status,
+          statusLabel: fmt.formatStatus(t.status),
+          statusClass: fmt.statusClass(t.status),
+          dueDateShort: fmt.formatDateShort(t.due_at),
+        });
+      }
       this.setData({ tasks: enriched });
       this._applyFilter();
     } catch (e) {
@@ -52,19 +62,32 @@ Page({
   _applyFilter() {
     const q = this.data.filterText.trim().toLowerCase();
     const all = this.data.tasks;
-    const filtered = q
-      ? all.filter(t =>
-          t.task_title.toLowerCase().includes(q) ||
-          t.room_code.toLowerCase().includes(q) ||
-          (t.building_name || '').toLowerCase().includes(q)
-        )
-      : all;
+    const filtered = [];
+    if (!q) {
+      this.setData({ filteredTasks: all });
+      return;
+    }
+    for (let i = 0; i < all.length; i += 1) {
+      const t = all[i];
+      const title = String(t.task_title || '').toLowerCase();
+      const room = String(t.room_code || '').toLowerCase();
+      const building = String(t.building_name || '').toLowerCase();
+      if (title.indexOf(q) !== -1 || room.indexOf(q) !== -1 || building.indexOf(q) !== -1) {
+        filtered.push(t);
+      }
+    }
     this.setData({ filteredTasks: filtered });
   },
 
   onTaskTap(e) {
     const id = Number(e.currentTarget.dataset.id);
-    const task = this.data.tasks.find(t => t.assignment_id === id);
+    let task = null;
+    for (let i = 0; i < this.data.tasks.length; i += 1) {
+      if (this.data.tasks[i].assignment_id === id) {
+        task = this.data.tasks[i];
+        break;
+      }
+    }
     if (!task) {
       wx.showToast({ title: '任务不存在，请刷新', icon: 'none' });
       return;
@@ -74,15 +97,15 @@ Page({
       return;
     }
     const params = [
-      `assignmentId=${encodeURIComponent(task.assignment_id)}`,
-      `roomCode=${encodeURIComponent(task.room_code || '')}`,
-      `buildingName=${encodeURIComponent(task.building_name || task.building_code || '')}`,
-      `taskTitle=${encodeURIComponent(task.task_title || '')}`,
-      `floor=${encodeURIComponent(task.floor_label || '')}`,
-      `location=${encodeURIComponent(task.location_text || '')}`,
+      'assignmentId=' + encodeURIComponent(task.assignment_id),
+      'roomCode=' + encodeURIComponent(task.room_code || ''),
+      'buildingName=' + encodeURIComponent(task.building_name || task.building_code || ''),
+      'taskTitle=' + encodeURIComponent(task.task_title || ''),
+      'floor=' + encodeURIComponent(task.floor_label || ''),
+      'location=' + encodeURIComponent(task.location_text || ''),
     ].join('&');
     wx.navigateTo({
-      url: `/pages/student/inspect/inspect?${params}`
+      url: '/pages/student/inspect/inspect?' + params
     });
   },
 
@@ -97,7 +120,5 @@ Page({
         }
       }
     });
-  },
-
-  goHistory() { wx.navigateTo({ url: '/pages/student/history/history' }); }
+  }
 });

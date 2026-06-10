@@ -65,15 +65,18 @@ function formatAssetMatch(v) { return ASSET_MATCH_LABEL[v] || v; }
 function formatDate(isoStr) {
   if (!isoStr) return '-';
   const d = new Date(isoStr);
-  const pad = n => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
 }
 
 function formatDateShort(isoStr) {
   if (!isoStr) return '-';
   const d = new Date(isoStr);
-  const pad = n => String(n).padStart(2, '0');
-  return `${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+}
+
+function pad2(value) {
+  const text = String(value);
+  return text.length < 2 ? '0' + text : text;
 }
 
 module.exports = {

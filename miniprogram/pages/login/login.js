@@ -20,7 +20,8 @@ Page({
   onInputPassword(e) { this.setData({ password: e.detail.value }); },
 
   async onLogin() {
-    const { username, password } = this.data;
+    const username = this.data.username;
+    const password = this.data.password;
     if (!username.trim() || !password.trim()) {
       this.setData({ error: '请填写用户名和密码' });
       return;

@@ -4,6 +4,8 @@
 export interface FrontendConfig {
   backendBaseUrl: string;   // 后端 API 基础地址
   mobileWebUrl: string;     // 移动端网页地址（用于学生跳转）
+  aiDefaultEndpoint: string;
+  aiDefaultModel: string;
 }
 
 /**
@@ -16,8 +18,14 @@ function resolveHostPort(port: number): string {
   return `${protocol}//${hostname}:${port}`;
 }
 
-export const frontendConfig: FrontendConfig = {
-  backendBaseUrl: resolveHostPort(18000),  // 后端监听端口
-  mobileWebUrl: resolveHostPort(5174)       // 移动端开发端口（生产环境改为 HTTPS 对应端口）
-};
+function readBuildEnv(name: string): string {
+  const value = import.meta.env[name];
+  return typeof value === "string" ? value.trim().replace(/\/$/, "") : "";
+}
 
+export const frontendConfig: FrontendConfig = {
+  backendBaseUrl: readBuildEnv("VITE_BACKEND_BASE_URL") || resolveHostPort(18000),
+  mobileWebUrl: readBuildEnv("VITE_MOBILE_WEB_URL") || resolveHostPort(5174),
+  aiDefaultEndpoint: readBuildEnv("VITE_AI_DEFAULT_ENDPOINT") || "https://api.openai.com/v1/chat/completions",
+  aiDefaultModel: readBuildEnv("VITE_AI_DEFAULT_MODEL") || "gpt-4o-mini"
+};

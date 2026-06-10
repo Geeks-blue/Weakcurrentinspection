@@ -1,5 +1,6 @@
 ﻿// 文件说明：该文件为弱电巡检系统源码，已按中文注释规范维护。
 import type { AiGatewayConfig } from "./types";
+import { frontendConfig } from "./config";
 
 const AI_CONFIG_KEY = "wc.ai.gateway.config";
 
@@ -8,9 +9,9 @@ export function loadAiConfig(): AiGatewayConfig {
   if (!cached) {
     return {
       mode: "backend_proxy",
-      endpoint: "https://api.openai.com/v1/chat/completions",
+      endpoint: frontendConfig.aiDefaultEndpoint,
       apiKey: "",
-      model: "gpt-4o-mini",
+      model: frontendConfig.aiDefaultModel,
       systemPrompt: "你是校园弱电巡检分析助手，请输出结构化风险结论。"
     };
   }
@@ -19,17 +20,17 @@ export function loadAiConfig(): AiGatewayConfig {
     const parsed = JSON.parse(cached) as AiGatewayConfig;
     return {
       mode: parsed.mode || "backend_proxy",
-      endpoint: parsed.endpoint || "https://api.openai.com/v1/chat/completions",
+      endpoint: parsed.endpoint || frontendConfig.aiDefaultEndpoint,
       apiKey: parsed.apiKey || "",
-      model: parsed.model || "gpt-4o-mini",
+      model: parsed.model || frontendConfig.aiDefaultModel,
       systemPrompt: parsed.systemPrompt || "你是校园弱电巡检分析助手，请输出结构化风险结论。"
     };
   } catch {
     return {
       mode: "backend_proxy",
-      endpoint: "https://api.openai.com/v1/chat/completions",
+      endpoint: frontendConfig.aiDefaultEndpoint,
       apiKey: "",
-      model: "gpt-4o-mini",
+      model: frontendConfig.aiDefaultModel,
       systemPrompt: "你是校园弱电巡检分析助手，请输出结构化风险结论。"
     };
   }

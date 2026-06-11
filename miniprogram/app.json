@@ -20,7 +20,7 @@
       "desc": "用于巡检签到和照片水印记录当前位置"
     }
   },
-  "requiredPrivateInfos": ["getLocation"],
+  "requiredPrivateInfos": ["getLocation", "chooseLocation"],
   "lazyCodeLoading": "requiredComponents",
   "usingComponents": {},
   "sitemapLocation": "sitemap.json"

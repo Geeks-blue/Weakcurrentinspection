@@ -12,10 +12,15 @@ Page({
     location: '',
     checkinLat: null,
     checkinLng: null,
+    checkinAccuracy: null,
     geoLocationText: '未获取定位',
     geoLocationButtonText: '获取定位',
     geoLocationError: '',
     geoLocationLoading: false,
+    mapLocationText: '未确认地图位置名称',
+    mapLocationName: '',
+    mapLocationAddress: '',
+    mapLocationLoading: false,
 
     // 签到方式
     checkinMode: 'qr',  // 'qr' | 'manual'
@@ -131,6 +136,17 @@ Page({
     });
   },
 
+  chooseLocation(latitude, longitude) {
+    return new Promise(function (resolve, reject) {
+      wx.chooseLocation({
+        latitude: latitude,
+        longitude: longitude,
+        success: resolve,
+        fail: reject,
+      });
+    });
+  },
+
   async loadCurrentLocation(showToast) {
     this.setData({
       geoLocationLoading: true,
@@ -144,9 +160,13 @@ Page({
       this.setData({
         checkinLat: location.latitude,
         checkinLng: location.longitude,
+        checkinAccuracy: typeof location.accuracy === 'number' ? location.accuracy : null,
         geoLocationText: geoLocationText,
         geoLocationButtonText: '重新定位',
         geoLocationError: '',
+        mapLocationText: '已获取经纬度，可点地图确认位置名称',
+        mapLocationName: '',
+        mapLocationAddress: '',
       });
       if (showToast) {
         wx.showToast({ title: '定位成功', icon: 'success' });
@@ -172,6 +192,45 @@ Page({
     this.loadCurrentLocation(true);
   },
 
+  async onChooseMapLocation() {
+    if (this.data.mapLocationLoading) return;
+    this.setData({ mapLocationLoading: true, geoLocationError: '' });
+    try {
+      if (!this._hasLocation()) {
+        const located = await this.loadCurrentLocation(false);
+        if (!located) {
+          wx.showToast({ title: '请先获取定位', icon: 'none' });
+          return;
+        }
+      }
+      const selected = await this.chooseLocation(this.data.checkinLat, this.data.checkinLng);
+      const latitude = Number(selected.latitude);
+      const longitude = Number(selected.longitude);
+      const name = (selected.name || '').trim();
+      const address = (selected.address || '').trim();
+      this.setData({
+        checkinLat: isFinite(latitude) ? latitude : this.data.checkinLat,
+        checkinLng: isFinite(longitude) ? longitude : this.data.checkinLng,
+        checkinAccuracy: null,
+        geoLocationText: this._formatGeoLocation({
+          latitude: isFinite(latitude) ? latitude : this.data.checkinLat,
+          longitude: isFinite(longitude) ? longitude : this.data.checkinLng,
+        }),
+        mapLocationName: name,
+        mapLocationAddress: address,
+        mapLocationText: this._formatMapLocation(name, address),
+      });
+    } catch (e) {
+      if (String((e && e.errMsg) || '').indexOf('cancel') === -1) {
+        const message = this._formatMapLocationError(e);
+        this.setData({ geoLocationError: message });
+        wx.showToast({ title: message, icon: 'none' });
+      }
+    } finally {
+      this.setData({ mapLocationLoading: false });
+    }
+  },
+
   _hasLocation() {
     return typeof this.data.checkinLat === 'number' && typeof this.data.checkinLng === 'number';
   },
@@ -185,6 +244,13 @@ Page({
       parts.push('精度 ±' + Math.round(location.accuracy) + 'm');
     }
     return parts.join('，');
+  },
+
+  _formatMapLocation(name, address) {
+    if (name && address && address.indexOf(name) === -1) {
+      return name + ' · ' + address;
+    }
+    return name || address || '地图已确认当前位置';
   },
 
   _formatCoordinate(value) {
@@ -201,6 +267,17 @@ Page({
       return '定位失败，请重试';
     }
     return '无法获取定位';
+  },
+
+  _formatMapLocationError(e) {
+    const msg = (e && e.errMsg) || '';
+    if (msg.indexOf('auth deny') !== -1) {
+      return '地图位置未授权';
+    }
+    if (msg.indexOf('fail') !== -1) {
+      return '地图位置获取失败';
+    }
+    return '无法确认地图位置';
   },
 
   // ---- QR扫码 ----
@@ -413,9 +490,17 @@ Page({
     return [
       '时间：' + this._formatWatermarkTime(new Date()),
       '地点：' + (locationText || '-'),
-      '定位：' + (this._hasLocation() ? this.data.geoLocationText : '未获取定位'),
+      '地图：' + (this._getMapLocationLabel() || '未确认地图位置名称'),
+      '坐标：' + (this._hasLocation() ? this.data.geoLocationText : '未获取定位'),
       '房间：' + (roomText || '-'),
     ];
+  },
+
+  _getMapLocationLabel() {
+    if (this.data.mapLocationName || this.data.mapLocationAddress) {
+      return this._formatMapLocation(this.data.mapLocationName, this.data.mapLocationAddress);
+    }
+    return '';
   },
 
   _formatWatermarkTime(date) {

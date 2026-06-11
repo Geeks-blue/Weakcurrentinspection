@@ -5,8 +5,10 @@
 .section-title { font-size: 28rpx; font-weight: 700; color: #13223a; margin-bottom: 16rpx; }
 .geo-head { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; }
 .geo-title { margin-bottom: 0; }
-.geo-refresh { width: 180rpx; flex-shrink: 0; }
-.geo-text { display: block; color: #24436f; font-size: 26rpx; line-height: 1.6; margin-top: 18rpx; }
+.geo-actions { display: flex; gap: 12rpx; flex-shrink: 0; }
+.geo-refresh, .geo-map { width: 172rpx; flex-shrink: 0; }
+.geo-name { display: block; color: #13223a; font-size: 28rpx; line-height: 1.6; margin-top: 18rpx; font-weight: 600; }
+.geo-text { display: block; color: #24436f; font-size: 26rpx; line-height: 1.6; margin-top: 8rpx; }
 .checkin-tabs { display: flex; gap: 16rpx; margin-bottom: 16rpx; }
 .ctab {
   flex: 1; text-align: center; padding: 16rpx;

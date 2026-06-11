@@ -10,13 +10,22 @@
   <view class="card geo-card">
     <view class="geo-head">
       <view class="section-title geo-title">地理位置</view>
-      <button
-        class="btn btn-ghost btn-sm geo-refresh"
-        loading="{{geoLocationLoading}}"
-        disabled="{{geoLocationLoading}}"
-        bindtap="onRefreshLocation"
-      >{{geoLocationButtonText}}</button>
+      <view class="geo-actions">
+        <button
+          class="btn btn-ghost btn-sm geo-refresh"
+          loading="{{geoLocationLoading}}"
+          disabled="{{geoLocationLoading}}"
+          bindtap="onRefreshLocation"
+        >{{geoLocationButtonText}}</button>
+        <button
+          class="btn btn-ghost btn-sm geo-map"
+          loading="{{mapLocationLoading}}"
+          disabled="{{mapLocationLoading}}"
+          bindtap="onChooseMapLocation"
+        >地图确认</button>
+      </view>
     </view>
+    <text class="geo-name">{{mapLocationText}}</text>
     <text class="geo-text">{{geoLocationText}}</text>
     <text class="error-tip" wx:if="{{geoLocationError}}">{{geoLocationError}}</text>
   </view>

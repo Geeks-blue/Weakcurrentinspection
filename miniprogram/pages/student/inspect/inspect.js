@@ -12,7 +12,8 @@ Page({
     location: '',
     checkinLat: null,
     checkinLng: null,
-    geoLocationText: '定位中...',
+    geoLocationText: '未获取定位',
+    geoLocationButtonText: '获取定位',
     geoLocationError: '',
     geoLocationLoading: false,
 
@@ -59,7 +60,6 @@ Page({
     });
     wx.setNavigationBarTitle({ title: '巡检·' + (options.roomCode || '') });
     this.loadRoomData();
-    this.loadCurrentLocation(false);
   },
 
   async loadRoomData() {
@@ -125,8 +125,6 @@ Page({
     return new Promise(function (resolve, reject) {
       wx.getLocation({
         type: 'gcj02',
-        isHighAccuracy: true,
-        highAccuracyExpireTime: 4000,
         success: resolve,
         fail: reject,
       });
@@ -136,8 +134,9 @@ Page({
   async loadCurrentLocation(showToast) {
     this.setData({
       geoLocationLoading: true,
+      geoLocationButtonText: '定位中...',
       geoLocationError: '',
-      geoLocationText: this._hasLocation() ? this.data.geoLocationText : '定位中...',
+      geoLocationText: this._hasLocation() ? this.data.geoLocationText : '正在获取当前位置...',
     });
     try {
       const location = await this.getLocation();
@@ -146,6 +145,7 @@ Page({
         checkinLat: location.latitude,
         checkinLng: location.longitude,
         geoLocationText: geoLocationText,
+        geoLocationButtonText: '重新定位',
         geoLocationError: '',
       });
       if (showToast) {
@@ -156,6 +156,7 @@ Page({
       const message = this._formatLocationError(e);
       this.setData({
         geoLocationError: message,
+        geoLocationButtonText: '重新定位',
         geoLocationText: '未获取定位',
       });
       if (showToast) {
@@ -301,11 +302,15 @@ Page({
   _createWatermarkedPhoto(localPath) {
     const that = this;
     return this._getImageInfo(localPath).then(function (info) {
-      const width = info.width;
-      const height = info.height;
-      if (!width || !height) {
+      const sourceWidth = info.width;
+      const sourceHeight = info.height;
+      if (!sourceWidth || !sourceHeight) {
         throw new Error('invalid image size');
       }
+      const maxWidth = 1280;
+      const scale = sourceWidth > maxWidth ? maxWidth / sourceWidth : 1;
+      const width = Math.round(sourceWidth * scale);
+      const height = Math.round(sourceHeight * scale);
       that.setData({
         watermarkCanvasWidth: width,
         watermarkCanvasHeight: height,

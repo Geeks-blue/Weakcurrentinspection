@@ -15,7 +15,7 @@
         loading="{{geoLocationLoading}}"
         disabled="{{geoLocationLoading}}"
         bindtap="onRefreshLocation"
-      >{{geoLocationLoading ? '定位中...' : '重新定位'}}</button>
+      >{{geoLocationButtonText}}</button>
     </view>
     <text class="geo-text">{{geoLocationText}}</text>
     <text class="error-tip" wx:if="{{geoLocationError}}">{{geoLocationError}}</text>

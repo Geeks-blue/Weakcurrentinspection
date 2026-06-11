@@ -10,6 +10,11 @@ Page({
     taskTitle: '',
     floor: '',
     location: '',
+    checkinLat: null,
+    checkinLng: null,
+    geoLocationText: '定位中...',
+    geoLocationError: '',
+    geoLocationLoading: false,
 
     // 签到方式
     checkinMode: 'qr',  // 'qr' | 'manual'
@@ -54,6 +59,7 @@ Page({
     });
     wx.setNavigationBarTitle({ title: '巡检·' + (options.roomCode || '') });
     this.loadRoomData();
+    this.loadCurrentLocation(false);
   },
 
   async loadRoomData() {
@@ -115,6 +121,87 @@ Page({
     });
   },
 
+  getLocation() {
+    return new Promise(function (resolve, reject) {
+      wx.getLocation({
+        type: 'gcj02',
+        isHighAccuracy: true,
+        highAccuracyExpireTime: 4000,
+        success: resolve,
+        fail: reject,
+      });
+    });
+  },
+
+  async loadCurrentLocation(showToast) {
+    this.setData({
+      geoLocationLoading: true,
+      geoLocationError: '',
+      geoLocationText: this._hasLocation() ? this.data.geoLocationText : '定位中...',
+    });
+    try {
+      const location = await this.getLocation();
+      const geoLocationText = this._formatGeoLocation(location);
+      this.setData({
+        checkinLat: location.latitude,
+        checkinLng: location.longitude,
+        geoLocationText: geoLocationText,
+        geoLocationError: '',
+      });
+      if (showToast) {
+        wx.showToast({ title: '定位成功', icon: 'success' });
+      }
+      return true;
+    } catch (e) {
+      const message = this._formatLocationError(e);
+      this.setData({
+        geoLocationError: message,
+        geoLocationText: '未获取定位',
+      });
+      if (showToast) {
+        wx.showToast({ title: message, icon: 'none' });
+      }
+      return false;
+    } finally {
+      this.setData({ geoLocationLoading: false });
+    }
+  },
+
+  onRefreshLocation() {
+    this.loadCurrentLocation(true);
+  },
+
+  _hasLocation() {
+    return typeof this.data.checkinLat === 'number' && typeof this.data.checkinLng === 'number';
+  },
+
+  _formatGeoLocation(location) {
+    const parts = [
+      '纬度 ' + this._formatCoordinate(location.latitude),
+      '经度 ' + this._formatCoordinate(location.longitude),
+    ];
+    if (typeof location.accuracy === 'number') {
+      parts.push('精度 ±' + Math.round(location.accuracy) + 'm');
+    }
+    return parts.join('，');
+  },
+
+  _formatCoordinate(value) {
+    const num = Number(value);
+    return isFinite(num) ? num.toFixed(6) : '-';
+  },
+
+  _formatLocationError(e) {
+    const msg = (e && e.errMsg) || '';
+    if (msg.indexOf('auth deny') !== -1 || msg.indexOf('authorize no response') !== -1) {
+      return '定位未授权，请开启位置权限';
+    }
+    if (msg.indexOf('fail') !== -1) {
+      return '定位失败，请重试';
+    }
+    return '无法获取定位';
+  },
+
   // ---- QR扫码 ----
   async onScanQR() {
     try {
@@ -156,6 +243,13 @@ Page({
   // ---- 拍照 ----
   async onTakePhoto() {
     try {
+      if (!this._hasLocation()) {
+        const located = await this.loadCurrentLocation(false);
+        if (!located) {
+          wx.showToast({ title: '请先获取定位', icon: 'none' });
+          return;
+        }
+      }
       const remaining = 5 - this.data.photos.length;
       if (remaining <= 0) {
         wx.showToast({ title: '最多上传5张照片', icon: 'none' });
@@ -314,6 +408,7 @@ Page({
     return [
       '时间：' + this._formatWatermarkTime(new Date()),
       '地点：' + (locationText || '-'),
+      '定位：' + (this._hasLocation() ? this.data.geoLocationText : '未获取定位'),
       '房间：' + (roomText || '-'),
     ];
   },
@@ -442,14 +537,20 @@ Page({
     if (checkinMode === 'manual' && uploadedKeys.length === 0) {
       wx.showToast({ title: '手动签到请先上传门牌照片', icon: 'none' }); return;
     }
+    if (!this._hasLocation()) {
+      const located = await this.loadCurrentLocation(false);
+      if (!located) {
+        wx.showToast({ title: '请先获取定位', icon: 'none' }); return;
+      }
+    }
 
     this.setData({ submitting: true, submitError: '' });
     try {
       await api.submitInspection({
         assignment_id: assignmentId,
         checkin_mode: checkinMode,
-        checkin_lat: 0,
-        checkin_lng: 0,
+        checkin_lat: this.data.checkinLat,
+        checkin_lng: this.data.checkinLng,
         manual_room_code: checkinMode === 'manual' ? manualCode.trim() : undefined,
         door_plate_photo_key: checkinMode === 'manual' ? uploadedKeys[0] : undefined,
         lock_state: lockState,

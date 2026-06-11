@@ -50,3 +50,9 @@
 }
 .add-icon { font-size: 48rpx; }
 .submit-area { margin-top: 24rpx; }
+.watermark-canvas {
+  position: fixed;
+  left: -9999px;
+  top: -9999px;
+  pointer-events: none;
+}

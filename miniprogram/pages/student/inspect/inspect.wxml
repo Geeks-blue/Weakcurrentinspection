@@ -130,3 +130,8 @@
   </view>
 </view>
 </scroll-view>
+<canvas
+  canvas-id="watermarkCanvas"
+  class="watermark-canvas"
+  style="width: {{watermarkCanvasWidth}}px; height: {{watermarkCanvasHeight}}px;"
+></canvas>

@@ -5,6 +5,7 @@ Page({
   data: {
     assignmentId: null,
     roomCode: '',
+    roomName: '',
     buildingName: '',
     taskTitle: '',
     floor: '',
@@ -24,6 +25,8 @@ Page({
 
     // 照片
     photos: [],  // [{localPath, key, uploading, error}]
+    watermarkCanvasWidth: 1,
+    watermarkCanvasHeight: 1,
 
     // 资产台账
     roomAssets: [],
@@ -43,6 +46,7 @@ Page({
     this.setData({
       assignmentId: Number(options.assignmentId),
       roomCode: decodeURIComponent(options.roomCode || ''),
+      roomName: decodeURIComponent(options.roomName || options.location || ''),
       buildingName: decodeURIComponent(options.buildingName || ''),
       taskTitle: decodeURIComponent(options.taskTitle || ''),
       floor: decodeURIComponent(options.floor || ''),
@@ -82,11 +86,11 @@ Page({
     });
   },
 
-  chooseImages() {
+  chooseImages(count) {
     return new Promise(function (resolve, reject) {
       if (wx.chooseMedia) {
         wx.chooseMedia({
-          count: 3,
+          count: count,
           mediaType: ['image'],
           sourceType: ['camera', 'album'],
           camera: 'back',
@@ -96,7 +100,7 @@ Page({
         return;
       }
       wx.chooseImage({
-        count: 3,
+        count: count,
         sourceType: ['camera', 'album'],
         success(res) {
           const tempFiles = [];
@@ -152,16 +156,29 @@ Page({
   // ---- 拍照 ----
   async onTakePhoto() {
     try {
-      const res = await this.chooseImages();
+      const remaining = 5 - this.data.photos.length;
+      if (remaining <= 0) {
+        wx.showToast({ title: '最多上传5张照片', icon: 'none' });
+        return;
+      }
+      const res = await this.chooseImages(Math.min(3, remaining));
       const tempFiles = (res && res.tempFiles) || [];
+      const pendingPhotos = [];
+      const photos = this.data.photos.slice();
       for (let i = 0; i < tempFiles.length; i += 1) {
         const item = tempFiles[i];
+        const localPath = item.tempFilePath;
+        if (!localPath) {
+          continue;
+        }
         const id = Date.now() + Math.random();
-        const entry = { id, localPath: item.tempFilePath, key: '', uploading: true, error: '' };
-        const photos = this.data.photos.slice();
+        const entry = { id, localPath: localPath, key: '', uploading: true, error: '' };
         photos.push(entry);
-        this.setData({ photos });
-        this._uploadPhoto(id, item.tempFilePath);
+        pendingPhotos.push(entry);
+      }
+      this.setData({ photos });
+      for (let i = 0; i < pendingPhotos.length; i += 1) {
+        await this._uploadPhoto(pendingPhotos[i].id, pendingPhotos[i].localPath);
       }
     } catch (e) {
       if (String(e.errMsg).indexOf('cancel') === -1) {
@@ -171,12 +188,190 @@ Page({
   },
 
   async _uploadPhoto(id, localPath) {
+    let uploadPath = localPath;
     try {
-      const data = await api.uploadPhoto(localPath, 'photo_' + Date.now() + '.jpg');
+      uploadPath = await this._createWatermarkedPhoto(localPath);
+      this._updatePhoto(id, { localPath: uploadPath });
+    } catch (e) {
+      this._updatePhoto(id, { uploading: false, error: '添加水印失败' });
+      return;
+    }
+    try {
+      const data = await api.uploadPhoto(uploadPath, 'photo_' + Date.now() + '.jpg');
       this._updatePhoto(id, { key: data.object_key, uploading: false });
     } catch (e) {
       this._updatePhoto(id, { uploading: false, error: '上传失败' });
     }
+  },
+
+  _createWatermarkedPhoto(localPath) {
+    const that = this;
+    return this._getImageInfo(localPath).then(function (info) {
+      const width = info.width;
+      const height = info.height;
+      if (!width || !height) {
+        throw new Error('invalid image size');
+      }
+      that.setData({
+        watermarkCanvasWidth: width,
+        watermarkCanvasHeight: height,
+      });
+      return that._nextTick().then(function () {
+        const ctx = wx.createCanvasContext('watermarkCanvas', that);
+        const imagePath = info.path || localPath;
+        const padding = Math.max(24, Math.round(width * 0.03));
+        const fontSize = Math.max(24, Math.round(width * 0.032));
+        const lineHeight = Math.ceil(fontSize * 1.45);
+        const maxTextWidth = width - padding * 2;
+        ctx.drawImage(imagePath, 0, 0, width, height);
+        ctx.setFontSize(fontSize);
+        const lines = that._wrapWatermarkLines(
+          ctx,
+          that._buildWatermarkTextLines(),
+          maxTextWidth,
+          fontSize
+        );
+        const panelHeight = lineHeight * lines.length + padding * 2;
+        const top = Math.max(0, height - panelHeight);
+        ctx.setFillStyle('rgba(0, 0, 0, 0.55)');
+        ctx.fillRect(0, top, width, panelHeight);
+        ctx.setFillStyle('#ffffff');
+        ctx.setFontSize(fontSize);
+        for (let i = 0; i < lines.length; i += 1) {
+          ctx.fillText(lines[i], padding, top + padding + fontSize + i * lineHeight);
+        }
+        return that._drawCanvas(ctx).then(function () {
+          return that._canvasToTempFilePath(width, height);
+        });
+      });
+    });
+  },
+
+  _getImageInfo(src) {
+    return new Promise(function (resolve, reject) {
+      wx.getImageInfo({
+        src: src,
+        success: resolve,
+        fail: reject,
+      });
+    });
+  },
+
+  _nextTick() {
+    return new Promise(function (resolve) {
+      if (wx.nextTick) {
+        wx.nextTick(resolve);
+      } else {
+        setTimeout(resolve, 0);
+      }
+    });
+  },
+
+  _drawCanvas(ctx) {
+    return new Promise(function (resolve) {
+      ctx.draw(false, resolve);
+    });
+  },
+
+  _canvasToTempFilePath(width, height) {
+    const that = this;
+    return new Promise(function (resolve, reject) {
+      wx.canvasToTempFilePath(
+        {
+          canvasId: 'watermarkCanvas',
+          x: 0,
+          y: 0,
+          width: width,
+          height: height,
+          destWidth: width,
+          destHeight: height,
+          fileType: 'jpg',
+          quality: 0.92,
+          success(res) {
+            resolve(res.tempFilePath);
+          },
+          fail: reject,
+        },
+        that
+      );
+    });
+  },
+
+  _buildWatermarkTextLines() {
+    const locationText = [
+      this.data.buildingName,
+      this.data.floor,
+      this.data.location,
+    ].filter(function (item) {
+      return !!item;
+    }).join(' ');
+    const roomText = [
+      this.data.roomCode,
+      this.data.roomName || this.data.location || this.data.buildingName,
+    ].filter(function (item) {
+      return !!item;
+    }).join(' ');
+    return [
+      '时间：' + this._formatWatermarkTime(new Date()),
+      '地点：' + (locationText || '-'),
+      '房间：' + (roomText || '-'),
+    ];
+  },
+
+  _formatWatermarkTime(date) {
+    return [
+      date.getFullYear(),
+      '-',
+      this._pad2(date.getMonth() + 1),
+      '-',
+      this._pad2(date.getDate()),
+      ' ',
+      this._pad2(date.getHours()),
+      ':',
+      this._pad2(date.getMinutes()),
+      ':',
+      this._pad2(date.getSeconds()),
+    ].join('');
+  },
+
+  _pad2(value) {
+    const text = String(value);
+    return text.length < 2 ? '0' + text : text;
+  },
+
+  _wrapWatermarkLines(ctx, lines, maxWidth, fontSize) {
+    const result = [];
+    for (let i = 0; i < lines.length; i += 1) {
+      const line = lines[i];
+      if (this._measureText(ctx, line, fontSize) <= maxWidth) {
+        result.push(line);
+        continue;
+      }
+      let current = '';
+      for (let j = 0; j < line.length; j += 1) {
+        const next = current + line[j];
+        if (current && this._measureText(ctx, next, fontSize) > maxWidth) {
+          result.push(current);
+          current = line[j];
+        } else {
+          current = next;
+        }
+      }
+      if (current) {
+        result.push(current);
+      }
+    }
+    return result;
+  },
+
+  _measureText(ctx, text, fontSize) {
+    if (ctx.measureText) {
+      const metrics = ctx.measureText(text);
+      if (metrics && metrics.width) {
+        return metrics.width;
+      }
+    }
+    return text.length * fontSize;
   },
 
   _updatePhoto(id, patch) {
@@ -186,7 +381,7 @@ Page({
       if (p.id === id) {
         photos.push({
           id: p.id,
-          localPath: p.localPath,
+          localPath: patch.localPath !== undefined ? patch.localPath : p.localPath,
           key: patch.key !== undefined ? patch.key : p.key,
           uploading: patch.uploading !== undefined ? patch.uploading : p.uploading,
           error: patch.error !== undefined ? patch.error : p.error,

@@ -13,6 +13,15 @@
 - AI_PROXY_TIMEOUT_SECONDS=30
 - CORS_ALLOW_ORIGINS=*
 - TENCENT_MAP_KEY=腾讯位置服务 Key（小程序文字位置解析）
+- WECHAT_TASK_TEMPLATE_ID=公众号任务派发模板消息 ID
+- WECHAT_TASK_NOTIFY_URL=公众号模板消息跳转网页地址（可选）
+- WECHAT_TASK_MINIPROGRAM_APPID=公众号模板消息跳转小程序 AppID（可选）
+- WECHAT_TASK_MINIPROGRAM_PAGEPATH=pages/student/tasks/tasks
+
+公众号派单通知说明：
+- 学生账号需在管理端账户管理中填写公众号 OpenID。
+- 模板消息建议包含 `first`、`keyword1`（任务标题）、`keyword2`（房间）、`keyword3`（截止时间）、`keyword4`（派发人）、`remark`。
+- 若未配置模板 ID、AppID/AppSecret 或学生 OpenID，派单仍会成功，仅跳过公众号通知。
 
 ## 1. 创建并激活虚拟环境（PowerShell）
 python -m venv .venv

@@ -414,6 +414,7 @@ const editUserRole = ref("");
 const editUserGender = ref<"male" | "female" | "">(""); 
 const editUserActive = ref(true);
 const editUserNewPassword = ref("");
+const editUserWechatOpenid = ref("");
 const editUserLoading = ref(false);
 const deletingUserId = ref<number | null>(null);
 const registerUsername = ref("");
@@ -421,6 +422,7 @@ const registerPassword = ref("");
 const registerRole = ref<UserRole>("student");
 const registerGender = ref<"male" | "female">("female");
 const registerActive = ref(true);
+const registerWechatOpenid = ref("");
 
 const aiConfig = ref(loadAiConfig());
 const aiPrompt = ref("请对比当前巡检摘要与历史基线，输出异常风险和处置建议。");
@@ -1528,7 +1530,9 @@ async function submitDispatch(): Promise<void> {
         })
       )
     );
-    dispatchMessage.value = `成功派单 ${results.length} 个任务，共分配给 ${dispatchStudentIds.value.length} 名学生${skipped.length ? `；以下房间因性别限制跳过：${skipped.join("、")}` : ""}`;
+    const notified = results.filter(r => r.notification_sent).length;
+    const notificationNotes = Array.from(new Set(results.map(r => r.notification_message).filter(Boolean)));
+    dispatchMessage.value = `成功派单 ${results.length} 个任务，共分配给 ${dispatchStudentIds.value.length} 名学生；公众号通知成功 ${notified} 个${notificationNotes.length ? `（${notificationNotes.join("；")}）` : ""}${skipped.length ? `；以下房间因性别限制跳过：${skipped.join("、")}` : ""}`;
     dispatchRoomIds.value = [];
     dispatchStudentIds.value = [];
     await Promise.all([loadPendingReviews(), loadPendingTasks()]);
@@ -1562,11 +1566,13 @@ async function submitRegisterUser(): Promise<void> {
       password: registerPassword.value,
       role: registerRole.value,
       gender: shouldCollectGender(registerRole.value) ? registerGender.value : null,
+      wechat_openid: registerWechatOpenid.value.trim() || null,
       is_active: registerActive.value
     };
     const result = await registerUser(payload);
     registerMessage.value = `创建成功：${result.user.username}（${formatRole(result.user.role)}）`;
     registerPassword.value = "";
+    registerWechatOpenid.value = "";
   } catch (error) {
     registerMessage.value = error instanceof Error ? error.message : "注册失败。";
   } finally {
@@ -1592,6 +1598,7 @@ function openEditUserDialog(user: UserManageItem): void {
   editUserGender.value = (user.gender as "male" | "female" | "") || "";
   editUserActive.value = user.is_active;
   editUserNewPassword.value = "";
+  editUserWechatOpenid.value = user.wechat_openid || "";
   usersMessage.value = "";
   usersError.value = "";
   showEditUserDialog.value = true;
@@ -1605,6 +1612,7 @@ async function submitEditUser(): Promise<void> {
     const payload: UpdateUserRequest = {
       role: editUserRole.value || undefined,
       gender: editUserRole.value === "student" ? (editUserGender.value || undefined) : undefined,
+      wechat_openid: editUserWechatOpenid.value.trim() || null,
       is_active: editUserActive.value,
       new_password: editUserNewPassword.value || undefined
     };
@@ -1844,6 +1852,10 @@ onMounted(async () => {
                 <option :value="false">禁用</option>
               </select>
             </div>
+            <div class="row">
+              <label for="registerWechatOpenid">公众号 OpenID（派单通知）</label>
+              <input id="registerWechatOpenid" v-model="registerWechatOpenid" placeholder="学生关注公众号后的 OpenID，可留空" />
+            </div>
           </div>
           <div class="actions">
             <button :disabled="registerLoading" @click="submitRegisterUser">
@@ -1869,6 +1881,7 @@ onMounted(async () => {
                   <th>账号</th>
                   <th>角色</th>
                   <th>性别</th>
+                  <th>公众号通知</th>
                   <th>状态</th>
                   <th>操作</th>
                 </tr>
@@ -1878,6 +1891,7 @@ onMounted(async () => {
                   <td>{{ user.username }}</td>
                   <td>{{ formatRole(user.role) }}</td>
                   <td>{{ user.gender === 'male' ? '男' : user.gender === 'female' ? '女' : '-' }}</td>
+                  <td>{{ user.wechat_openid ? '已绑定' : '未绑定' }}</td>
                   <td><span :class="user.is_active ? 'record-status status-approved' : 'record-status status-rejected'">{{ user.is_active ? '启用' : '禁用' }}</span></td>
                   <td>
                     <div class="table-action-group">
@@ -1948,7 +1962,7 @@ onMounted(async () => {
                     :checked="dispatchStudentIds.includes(student.student_user_id)"
                     @change="toggleDispatchStudent(student.student_user_id)"
                   />
-                  {{ student.username }}（{{ student.gender === 'female' ? '女' : student.gender === 'male' ? '男' : '未设置' }}）
+                  {{ student.username }}（{{ student.gender === 'female' ? '女' : student.gender === 'male' ? '男' : '未设置' }} · {{ student.wechat_bound ? '公众号已绑' : '未绑公众号' }}）
                 </label>
                 <p class="hint" v-if="filteredDispatchStudents.length === 0">无符合条件的学生</p>
               </div>
@@ -2669,6 +2683,10 @@ onMounted(async () => {
           <div class="row">
             <label>新密码（留空不修改）</label>
             <input v-model="editUserNewPassword" type="password" placeholder="至少 6 位，留空不修改" />
+          </div>
+          <div class="row">
+            <label>公众号 OpenID（派单通知）</label>
+            <input v-model="editUserWechatOpenid" placeholder="学生关注公众号后的 OpenID，留空清除" />
           </div>
         </div>
         <div class="actions">

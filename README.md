@@ -160,10 +160,16 @@ ALTER TABLE rooms ADD COLUMN IF NOT EXISTS gender_restriction VARCHAR(16) NOT NU
 | `MINIO_ROOT_PASSWORD` | MinIO 管理员密码，**生产必须修改** |
 | `WECHAT_APPID` | 微信公众号 AppID（扫一扫功能，选填） |
 | `WECHAT_APPSECRET` | 微信公众号 AppSecret（选填） |
+| `WECHAT_TASK_TEMPLATE_ID` | 公众号任务派发模板消息 ID（派单通知） |
+| `WECHAT_TASK_NOTIFY_URL` | 公众号模板消息跳转网页地址（可选） |
+| `WECHAT_TASK_MINIPROGRAM_APPID` | 公众号模板消息跳转小程序 AppID（可选） |
+| `WECHAT_TASK_MINIPROGRAM_PAGEPATH` | 公众号模板消息跳转小程序路径，默认任务列表 |
 | `TENCENT_MAP_KEY` | 腾讯位置服务 Key，用于小程序经纬度反查文字位置 |
 | `AI_PROVIDER_API_KEY` | AI 服务 API Key（选填） |
 | `AI_DEFAULT_ENDPOINT` | AI 接口地址，默认 OpenAI |
 | `AI_DEFAULT_MODEL` | 默认模型，默认 gpt-4o-mini |
+
+公众号派单通知需要学生关注公众号，并在管理端账户管理中维护该学生的公众号 OpenID；未绑定或未配置模板时，派单仍会成功，仅跳过通知。
 
 ---
 

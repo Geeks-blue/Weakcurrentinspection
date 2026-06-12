@@ -511,6 +511,8 @@ export interface CreateTaskAssignmentPayload {
 export interface CreateTaskAssignmentResponse {
   assignment_id: number;
   message: string;
+  notification_sent: boolean;
+  notification_message: string | null;
 }
 
 export async function createTaskAssignment(
@@ -541,12 +543,14 @@ export interface UserManageItem {
   username: string;
   role: string;
   gender: string | null;
+  wechat_openid: string | null;
   is_active: boolean;
 }
 
 export interface UpdateUserRequest {
   role?: string;
   gender?: string | null;
+  wechat_openid?: string | null;
   is_active?: boolean;
   new_password?: string;
 }

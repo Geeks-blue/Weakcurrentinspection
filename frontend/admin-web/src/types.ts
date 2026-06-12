@@ -43,6 +43,7 @@ export interface RegisterUserRequest {
   password: string;
   role: UserRole;
   gender: UserGender | null;
+  wechat_openid?: string | null;
   is_active: boolean;
 }
 
@@ -168,6 +169,7 @@ export interface DispatchStudentOption {
   student_user_id: number;
   username: string;
   gender: string | null;
+  wechat_bound: boolean;
 }
 
 export interface TaskDispatchOptionsResponse {

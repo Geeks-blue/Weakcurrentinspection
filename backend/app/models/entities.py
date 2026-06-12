@@ -24,6 +24,7 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
     role: Mapped[str] = mapped_column(String(16), nullable=False)
     gender: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    wechat_openid: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

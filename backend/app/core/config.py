@@ -24,6 +24,10 @@ class Settings:
     )
     wechat_appid: str = os.getenv("WECHAT_APPID", "")
     wechat_appsecret: str = os.getenv("WECHAT_APPSECRET", "")
+    wechat_task_template_id: str = os.getenv("WECHAT_TASK_TEMPLATE_ID", "")
+    wechat_task_notify_url: str = os.getenv("WECHAT_TASK_NOTIFY_URL", "")
+    wechat_task_miniprogram_appid: str = os.getenv("WECHAT_TASK_MINIPROGRAM_APPID", "")
+    wechat_task_miniprogram_pagepath: str = os.getenv("WECHAT_TASK_MINIPROGRAM_PAGEPATH", "")
     tencent_map_key: str = os.getenv("TENCENT_MAP_KEY", "")
 
     @property

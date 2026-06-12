@@ -160,6 +160,7 @@ ALTER TABLE rooms ADD COLUMN IF NOT EXISTS gender_restriction VARCHAR(16) NOT NU
 | `MINIO_ROOT_PASSWORD` | MinIO 管理员密码，**生产必须修改** |
 | `WECHAT_APPID` | 微信公众号 AppID（扫一扫功能，选填） |
 | `WECHAT_APPSECRET` | 微信公众号 AppSecret（选填） |
+| `TENCENT_MAP_KEY` | 腾讯位置服务 Key，用于小程序经纬度反查文字位置 |
 | `AI_PROVIDER_API_KEY` | AI 服务 API Key（选填） |
 | `AI_DEFAULT_ENDPOINT` | AI 接口地址，默认 OpenAI |
 | `AI_DEFAULT_MODEL` | 默认模型，默认 gpt-4o-mini |

@@ -17,12 +17,6 @@
           disabled="{{geoLocationLoading}}"
           bindtap="onRefreshLocation"
         >{{geoLocationButtonText}}</button>
-        <button
-          class="btn btn-ghost btn-sm geo-map"
-          loading="{{mapLocationLoading}}"
-          disabled="{{mapLocationLoading}}"
-          bindtap="onChooseMapLocation"
-        >地图确认</button>
       </view>
     </view>
     <text class="geo-name">{{mapLocationText}}</text>

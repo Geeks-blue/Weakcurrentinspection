@@ -72,3 +72,53 @@ async def jssdk_config(
         "nonceStr": noncestr,
         "signature": signature,
     }
+
+
+@router.get("/reverse-geocode")
+async def reverse_geocode(
+    latitude: float = Query(..., ge=-90, le=90),
+    longitude: float = Query(..., ge=-180, le=180),
+):
+    if not settings.tencent_map_key:
+        raise HTTPException(status_code=503, detail="Tencent Map key not configured")
+
+    try:
+        async with httpx.AsyncClient(timeout=6) as client:
+            resp = await client.get(
+                "https://apis.map.qq.com/ws/geocoder/v1/",
+                params={
+                    "location": f"{latitude},{longitude}",
+                    "key": settings.tencent_map_key,
+                    "get_poi": 0,
+                },
+            )
+            resp.raise_for_status()
+            data = resp.json()
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=502, detail=f"Tencent Map request failed: {exc}"
+        ) from exc
+
+    if data.get("status") != 0:
+        raise HTTPException(
+            status_code=502, detail=f"Tencent Map reverse geocode error: {data}"
+        )
+
+    result = data.get("result") or {}
+    formatted = result.get("formatted_addresses") or {}
+    component = result.get("address_component") or {}
+    name = (
+        formatted.get("recommend")
+        or formatted.get("rough")
+        or result.get("address")
+        or ""
+    )
+    address = result.get("address") or name
+
+    return {
+        "name": name,
+        "address": address,
+        "province": component.get("province") or "",
+        "city": component.get("city") or "",
+        "district": component.get("district") or "",
+    }

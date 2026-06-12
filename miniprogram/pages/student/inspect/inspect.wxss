@@ -6,7 +6,7 @@
 .geo-head { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; }
 .geo-title { margin-bottom: 0; }
 .geo-actions { display: flex; gap: 12rpx; flex-shrink: 0; }
-.geo-refresh, .geo-map { width: 172rpx; flex-shrink: 0; }
+.geo-refresh { width: 190rpx; flex-shrink: 0; }
 .geo-name { display: block; color: #13223a; font-size: 28rpx; line-height: 1.6; margin-top: 18rpx; font-weight: 600; }
 .geo-text { display: block; color: #24436f; font-size: 26rpx; line-height: 1.6; margin-top: 8rpx; }
 .checkin-tabs { display: flex; gap: 16rpx; margin-bottom: 16rpx; }

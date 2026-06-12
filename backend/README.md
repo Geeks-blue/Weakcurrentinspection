@@ -12,6 +12,7 @@
 - AI_DEFAULT_MODEL=gpt-4o-mini
 - AI_PROXY_TIMEOUT_SECONDS=30
 - CORS_ALLOW_ORIGINS=*
+- TENCENT_MAP_KEY=腾讯位置服务 Key（小程序文字位置解析）
 
 ## 1. 创建并激活虚拟环境（PowerShell）
 python -m venv .venv

@@ -17,10 +17,9 @@ Page({
     geoLocationButtonText: '获取定位',
     geoLocationError: '',
     geoLocationLoading: false,
-    mapLocationText: '未确认地图位置名称',
+    mapLocationText: '未获取文字位置',
     mapLocationName: '',
     mapLocationAddress: '',
-    mapLocationLoading: false,
 
     // 签到方式
     checkinMode: 'qr',  // 'qr' | 'manual'
@@ -136,37 +135,28 @@ Page({
     });
   },
 
-  chooseLocation(latitude, longitude) {
-    return new Promise(function (resolve, reject) {
-      wx.chooseLocation({
-        latitude: latitude,
-        longitude: longitude,
-        success: resolve,
-        fail: reject,
-      });
-    });
-  },
-
   async loadCurrentLocation(showToast) {
     this.setData({
       geoLocationLoading: true,
       geoLocationButtonText: '定位中...',
       geoLocationError: '',
       geoLocationText: this._hasLocation() ? this.data.geoLocationText : '正在获取当前位置...',
+      mapLocationText: this._hasLocation() ? this.data.mapLocationText : '正在解析文字位置...',
     });
     try {
       const location = await this.getLocation();
       const geoLocationText = this._formatGeoLocation(location);
+      const place = await this._resolveTextLocation(location.latitude, location.longitude);
       this.setData({
         checkinLat: location.latitude,
         checkinLng: location.longitude,
         checkinAccuracy: typeof location.accuracy === 'number' ? location.accuracy : null,
         geoLocationText: geoLocationText,
-        geoLocationButtonText: '重新定位',
-        geoLocationError: '',
-        mapLocationText: '已获取经纬度，可点地图确认位置名称',
-        mapLocationName: '',
-        mapLocationAddress: '',
+        geoLocationButtonText: '重新获取',
+        geoLocationError: place.error || '',
+        mapLocationText: place.text,
+        mapLocationName: place.name,
+        mapLocationAddress: place.address,
       });
       if (showToast) {
         wx.showToast({ title: '定位成功', icon: 'success' });
@@ -176,8 +166,9 @@ Page({
       const message = this._formatLocationError(e);
       this.setData({
         geoLocationError: message,
-        geoLocationButtonText: '重新定位',
+        geoLocationButtonText: '重新获取',
         geoLocationText: '未获取定位',
+        mapLocationText: '未获取文字位置',
       });
       if (showToast) {
         wx.showToast({ title: message, icon: 'none' });
@@ -192,42 +183,28 @@ Page({
     this.loadCurrentLocation(true);
   },
 
-  async onChooseMapLocation() {
-    if (this.data.mapLocationLoading) return;
-    this.setData({ mapLocationLoading: true, geoLocationError: '' });
+  async _resolveTextLocation(latitude, longitude) {
     try {
-      if (!this._hasLocation()) {
-        const located = await this.loadCurrentLocation(false);
-        if (!located) {
-          wx.showToast({ title: '请先获取定位', icon: 'none' });
-          return;
-        }
-      }
-      const selected = await this.chooseLocation(this.data.checkinLat, this.data.checkinLng);
-      const latitude = Number(selected.latitude);
-      const longitude = Number(selected.longitude);
-      const name = (selected.name || '').trim();
-      const address = (selected.address || '').trim();
-      this.setData({
-        checkinLat: isFinite(latitude) ? latitude : this.data.checkinLat,
-        checkinLng: isFinite(longitude) ? longitude : this.data.checkinLng,
-        checkinAccuracy: null,
-        geoLocationText: this._formatGeoLocation({
-          latitude: isFinite(latitude) ? latitude : this.data.checkinLat,
-          longitude: isFinite(longitude) ? longitude : this.data.checkinLng,
-        }),
-        mapLocationName: name,
-        mapLocationAddress: address,
-        mapLocationText: this._formatMapLocation(name, address),
-      });
+      const data = await api.reverseGeocode(latitude, longitude);
+      const name = (data && data.name ? data.name : '').trim();
+      const address = (data && data.address ? data.address : '').trim();
+      return {
+        name: name,
+        address: address,
+        text: this._formatMapLocation(name, address),
+        error: '',
+      };
     } catch (e) {
-      if (String((e && e.errMsg) || '').indexOf('cancel') === -1) {
-        const message = this._formatMapLocationError(e);
-        this.setData({ geoLocationError: message });
-        wx.showToast({ title: message, icon: 'none' });
-      }
-    } finally {
-      this.setData({ mapLocationLoading: false });
+      const message = (e && e.message) || '';
+      const friendlyMessage = message.indexOf('Tencent Map key') !== -1
+        ? '文字位置服务未配置'
+        : '文字位置获取失败';
+      return {
+        name: '',
+        address: '',
+        text: '文字位置获取失败，已保留经纬度',
+        error: friendlyMessage,
+      };
     }
   },
 
@@ -267,17 +244,6 @@ Page({
       return '定位失败，请重试';
     }
     return '无法获取定位';
-  },
-
-  _formatMapLocationError(e) {
-    const msg = (e && e.errMsg) || '';
-    if (msg.indexOf('auth deny') !== -1) {
-      return '地图位置未授权';
-    }
-    if (msg.indexOf('fail') !== -1) {
-      return '地图位置获取失败';
-    }
-    return '无法确认地图位置';
   },
 
   // ---- QR扫码 ----

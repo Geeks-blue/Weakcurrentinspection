@@ -1,24 +1,39 @@
 // pages/student/history/history.js
-const api = require('../../../utils/api');
-const fmt = require('../../../utils/format');
+const api = require("../../../utils/api");
+const fmt = require("../../../utils/format");
 
 Page({
   data: {
     records: [],
     loading: false,
-    error: '',
+    error: "",
   },
 
   onLoad() {
     if (!getApp().globalData.token) {
-      wx.redirectTo({ url: '/pages/login/login' });
+      wx.redirectTo({ url: "/pages/login/login" });
       return;
     }
-    this.loadRecords();
   },
 
-  async loadRecords() {
-    this.setData({ loading: true, error: '' });
+  onShow() {
+    if (!getApp().globalData.token) return;
+    this.loadRecords(this.data.records.length > 0);
+  },
+
+  async onPullDownRefresh() {
+    await this.loadRecords(false);
+    wx.stopPullDownRefresh();
+  },
+
+  async loadRecords(silent) {
+    if (this._loadingRecords) return;
+    this._loadingRecords = true;
+    if (!silent) {
+      this.setData({ loading: true, error: "" });
+    } else {
+      this.setData({ error: "" });
+    }
     try {
       const data = await api.getMyInspections();
       const records = [];
@@ -54,7 +69,10 @@ Page({
     } catch (e) {
       this.setData({ error: e.message });
     } finally {
-      this.setData({ loading: false });
+      if (!silent) {
+        this.setData({ loading: false });
+      }
+      this._loadingRecords = false;
     }
   },
 
@@ -72,5 +90,5 @@ Page({
       }
     }
     return [];
-  }
+  },
 });

@@ -1,34 +1,74 @@
 // pages/admin/records/records.js
-const api = require('../../../utils/api');
-const fmt = require('../../../utils/format');
+const api = require("../../../utils/api");
+const fmt = require("../../../utils/format");
 
 Page({
   data: {
     records: [],
     loading: false,
-    error: '',
-    filterStatus: '',
-    filterRoom: '',
-    filterStudent: '',
+    error: "",
+    filterStatus: "",
+    filterRoom: "",
+    filterStudent: "",
     statusOptions: [
-      { label: '全部', value: '' },
-      { label: '待审核', value: 'pending_review' },
-      { label: '已通过', value: 'approved' },
-      { label: '驳回', value: 'rejected' },
-      { label: '需整改', value: 'rectify_required' },
+      { label: "全部", value: "" },
+      { label: "待审核", value: "pending_review" },
+      { label: "已通过", value: "approved" },
+      { label: "驳回", value: "rejected" },
+      { label: "需整改", value: "rectify_required" },
     ],
     expanded: {},
   },
 
   onLoad() {
     if (!getApp().isAdmin()) {
-      wx.redirectTo({ url: '/pages/login/login' }); return;
+      wx.redirectTo({ url: "/pages/login/login" });
+      return;
     }
-    this.load();
   },
 
-  async load() {
-    this.setData({ loading: true, error: '' });
+  onShow() {
+    if (!getApp().isAdmin()) return;
+    this.load(this.data.records.length > 0);
+    this._startAutoRefresh();
+  },
+
+  onHide() {
+    this._stopAutoRefresh();
+  },
+
+  onUnload() {
+    this._stopAutoRefresh();
+  },
+
+  async onPullDownRefresh() {
+    await this.load(false);
+    wx.stopPullDownRefresh();
+  },
+
+  _startAutoRefresh() {
+    this._stopAutoRefresh();
+    const that = this;
+    this._refreshTimer = setInterval(function () {
+      that.load(true);
+    }, 15000);
+  },
+
+  _stopAutoRefresh() {
+    if (this._refreshTimer) {
+      clearInterval(this._refreshTimer);
+      this._refreshTimer = null;
+    }
+  },
+
+  async load(silent) {
+    if (this._loadingRecords) return;
+    this._loadingRecords = true;
+    if (!silent) {
+      this.setData({ loading: true, error: "" });
+    } else {
+      this.setData({ error: "" });
+    }
     try {
       const data = await api.getConsoleRecords({
         status: this.data.filterStatus || undefined,
@@ -70,17 +110,28 @@ Page({
     } catch (e) {
       this.setData({ error: e.message });
     } finally {
-      this.setData({ loading: false });
+      if (!silent) {
+        this.setData({ loading: false });
+      }
+      this._loadingRecords = false;
     }
   },
 
   onFilterStatusChange(e) {
-    this.setData({ filterStatus: this.data.statusOptions[e.detail.value].value });
+    this.setData({
+      filterStatus: this.data.statusOptions[e.detail.value].value,
+    });
     this.load();
   },
-  onFilterRoomInput(e) { this.setData({ filterRoom: e.detail.value }); },
-  onFilterStudentInput(e) { this.setData({ filterStudent: e.detail.value }); },
-  onSearch() { this.load(); },
+  onFilterRoomInput(e) {
+    this.setData({ filterRoom: e.detail.value });
+  },
+  onFilterStudentInput(e) {
+    this.setData({ filterStudent: e.detail.value });
+  },
+  onSearch() {
+    this.load();
+  },
 
   toggleExpand(e) {
     const id = e.currentTarget.dataset.id;

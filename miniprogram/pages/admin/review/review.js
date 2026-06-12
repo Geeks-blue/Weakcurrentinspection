@@ -1,30 +1,69 @@
 // pages/admin/review/review.js
-const api = require('../../../utils/api');
-const fmt = require('../../../utils/format');
+const api = require("../../../utils/api");
+const fmt = require("../../../utils/format");
 
 Page({
   data: {
     items: [],
     loading: false,
-    error: '',
-    username: '',
-    expanded: {},   // inspection_id → bool
-    reviewing: {},  // inspection_id → bool
+    error: "",
+    username: "",
+    expanded: {}, // inspection_id → bool
+    reviewing: {}, // inspection_id → bool
   },
 
   onLoad() {
     const app = getApp();
     if (!app.globalData.token || !app.isAdmin()) {
-      wx.redirectTo({ url: '/pages/login/login' });
+      wx.redirectTo({ url: "/pages/login/login" });
       return;
     }
     const user = app.globalData.user || {};
-    this.setData({ username: user.username || '' });
-    this.load();
+    this.setData({ username: user.username || "" });
   },
 
-  async load() {
-    this.setData({ loading: true, error: '' });
+  onShow() {
+    if (!getApp().isAdmin()) return;
+    this.load(this.data.items.length > 0);
+    this._startAutoRefresh();
+  },
+
+  onHide() {
+    this._stopAutoRefresh();
+  },
+
+  onUnload() {
+    this._stopAutoRefresh();
+  },
+
+  async onPullDownRefresh() {
+    await this.load(false);
+    wx.stopPullDownRefresh();
+  },
+
+  _startAutoRefresh() {
+    this._stopAutoRefresh();
+    const that = this;
+    this._refreshTimer = setInterval(function () {
+      that.load(true);
+    }, 10000);
+  },
+
+  _stopAutoRefresh() {
+    if (this._refreshTimer) {
+      clearInterval(this._refreshTimer);
+      this._refreshTimer = null;
+    }
+  },
+
+  async load(silent) {
+    if (this._loadingReview) return;
+    this._loadingReview = true;
+    if (!silent) {
+      this.setData({ loading: true, error: "" });
+    } else {
+      this.setData({ error: "" });
+    }
     try {
       const data = await api.getPendingReview();
       const items = [];
@@ -61,7 +100,10 @@ Page({
     } catch (e) {
       this.setData({ error: e.message });
     } finally {
-      this.setData({ loading: false });
+      if (!silent) {
+        this.setData({ loading: false });
+      }
+      this._loadingReview = false;
     }
   },
 
@@ -96,38 +138,42 @@ Page({
 
   async onApprove(e) {
     const id = e.currentTarget.dataset.id;
-    await this._review(id, 'approved', '');
+    await this._review(id, "approved", "");
   },
 
   async onReject(e) {
     const id = e.currentTarget.dataset.id;
     const result = await new Promise(function (resolve) {
       wx.showModal({
-        title: '驳回原因',
+        title: "驳回原因",
         editable: true,
-        placeholderText: '请填写驳回原因',
-        success(r) { resolve({ value: r.content || '' }); },
-        fail() { resolve({ value: null }); }
+        placeholderText: "请填写驳回原因",
+        success(r) {
+          resolve({ value: r.content || "" });
+        },
+        fail() {
+          resolve({ value: null });
+        },
       });
     });
     const reason = result.value;
     if (reason === null) return;
-    await this._review(id, 'rejected', reason);
+    await this._review(id, "rejected", reason);
   },
 
   async onRectify(e) {
     const id = e.currentTarget.dataset.id;
-    await this._review(id, 'rectify_required', '需整改');
+    await this._review(id, "rectify_required", "需整改");
   },
 
   async _review(id, action, reason) {
     this.setReviewing(id, true);
     try {
       await api.reviewInspection(id, action, reason);
-      wx.showToast({ title: '审核完成', icon: 'success' });
-      this.load();
+      wx.showToast({ title: "审核完成", icon: "success" });
+      this.load(false);
     } catch (e) {
-      wx.showToast({ title: e.message, icon: 'none' });
+      wx.showToast({ title: e.message, icon: "none" });
     } finally {
       this.setReviewing(id, false);
     }
@@ -147,10 +193,14 @@ Page({
 
   onLogout() {
     wx.showModal({
-      title: '退出', content: '确定退出吗？',
+      title: "退出",
+      content: "确定退出吗？",
       success(r) {
-        if (r.confirm) { getApp().clearAuth(); wx.redirectTo({ url: '/pages/login/login' }); }
-      }
+        if (r.confirm) {
+          getApp().clearAuth();
+          wx.redirectTo({ url: "/pages/login/login" });
+        }
+      },
     });
   },
 });

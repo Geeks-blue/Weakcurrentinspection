@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 文件说明：该页面是管理端核心交互页面，按中文注释规范维护。
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 
 import { callAiGateway, stripMarkdown, type ChatMessage } from "./api/ai";
 import {
@@ -62,6 +62,9 @@ type ConsolePage = "workspace" | "settings";
 type WorkspaceSub = "inspection" | "assets" | "records" | "accounts";
 type ViewHash = ConsolePage | "login";
 type RoomInspectionGroup = { building_code: string; room_code: string; items: ConsoleInspectionItem[] };
+const LIVE_REFRESH_INTERVAL_MS = 10000;
+let liveRefreshTimer: number | null = null;
+let liveRefreshListenersBound = false;
 
 const username = ref("");
 const password = ref("");
@@ -988,19 +991,25 @@ async function onAssetsImportChange(event: Event): Promise<void> {
   }
 }
 
-async function loadPendingTasks(): Promise<void> {
+async function loadPendingTasks(options: { silent?: boolean } = {}): Promise<void> {
   if (!isReviewer.value) {
     return;
   }
 
-  pendingTasksLoading.value = true;
-  pendingTasksError.value = "";
+  if (!options.silent) {
+    pendingTasksLoading.value = true;
+    pendingTasksError.value = "";
+  }
   try {
     pendingTasks.value = await getPendingTaskAssignments();
   } catch (error) {
-    pendingTasksError.value = error instanceof Error ? error.message : "加载待巡检任务失败。";
+    if (!options.silent) {
+      pendingTasksError.value = error instanceof Error ? error.message : "加载待巡检任务失败。";
+    }
   } finally {
-    pendingTasksLoading.value = false;
+    if (!options.silent) {
+      pendingTasksLoading.value = false;
+    }
   }
 }
 
@@ -1323,6 +1332,7 @@ async function handleLogin(): Promise<void> {
     await Promise.all([loadPendingReviews(), loadDispatchOptions(), loadPendingTasks()]);
     await Promise.all([loadConsoleInspections(), loadAssetData()]);
     switchConsolePage("workspace");
+    ensureLiveRefresh();
   } catch (error) {
     authMessage.value = error instanceof Error ? error.message : "登录失败。";
   } finally {
@@ -1331,6 +1341,7 @@ async function handleLogin(): Promise<void> {
 }
 
 function handleLogout(): void {
+  cleanupLiveRefresh();
   clearAccessToken();
   currentUser.value = null;
   pendingReviews.value = [];
@@ -1361,18 +1372,81 @@ function handleLogout(): void {
   setViewHash("login");
 }
 
-async function loadPendingReviews(): Promise<void> {
-  pendingLoading.value = true;
-  pendingError.value = "";
+async function loadPendingReviews(options: { silent?: boolean } = {}): Promise<void> {
+  if (!isReviewer.value) {
+    return;
+  }
+  if (!options.silent) {
+    pendingLoading.value = true;
+    pendingError.value = "";
+  }
   try {
     pendingReviews.value = await getPendingReviewInspections();
-    if (pendingReviews.value.length > 0 && !selectedInspectionId.value) {
+    const selectedExists = pendingReviews.value.some((item) => item.inspection_id === selectedInspectionId.value);
+    if (pendingReviews.value.length > 0 && (!selectedInspectionId.value || !selectedExists)) {
       selectedInspectionId.value = pendingReviews.value[0].inspection_id;
+    } else if (pendingReviews.value.length === 0) {
+      selectedInspectionId.value = null;
     }
   } catch (error) {
-    pendingError.value = error instanceof Error ? error.message : "加载待审核列表失败。";
+    if (!options.silent) {
+      pendingError.value = error instanceof Error ? error.message : "加载待审核列表失败。";
+    }
   } finally {
-    pendingLoading.value = false;
+    if (!options.silent) {
+      pendingLoading.value = false;
+    }
+  }
+}
+
+async function refreshLiveInspectionWorkspace(): Promise<void> {
+  if (
+    !isReviewer.value ||
+    activePage.value !== "workspace" ||
+    workspaceSub.value !== "inspection" ||
+    document.hidden
+  ) {
+    return;
+  }
+  await Promise.all([
+    loadPendingReviews({ silent: true }),
+    loadPendingTasks({ silent: true })
+  ]);
+}
+
+function startLiveRefresh(): void {
+  if (liveRefreshTimer !== null) return;
+  liveRefreshTimer = window.setInterval(() => {
+    refreshLiveInspectionWorkspace();
+  }, LIVE_REFRESH_INTERVAL_MS);
+}
+
+function stopLiveRefresh(): void {
+  if (liveRefreshTimer !== null) {
+    window.clearInterval(liveRefreshTimer);
+    liveRefreshTimer = null;
+  }
+}
+
+function handleVisibilityChange(): void {
+  if (!document.hidden) {
+    refreshLiveInspectionWorkspace();
+  }
+}
+
+function ensureLiveRefresh(): void {
+  if (!liveRefreshListenersBound) {
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    liveRefreshListenersBound = true;
+  }
+  startLiveRefresh();
+}
+
+function cleanupLiveRefresh(): void {
+  stopLiveRefresh();
+  if (liveRefreshListenersBound) {
+    document.removeEventListener("visibilitychange", handleVisibilityChange);
+    liveRefreshListenersBound = false;
   }
 }
 
@@ -1717,12 +1791,18 @@ onMounted(async () => {
       activePage.value = p;
       workspaceSub.value = s;
       if (s === "accounts" && users.value.length === 0) loadUsers();
+      refreshLiveInspectionWorkspace();
     });
+    ensureLiveRefresh();
   } catch {
     clearAccessToken();
     currentUser.value = null;
     setViewHash("login");
   }
+});
+
+onUnmounted(() => {
+  cleanupLiveRefresh();
 });
 </script>
 

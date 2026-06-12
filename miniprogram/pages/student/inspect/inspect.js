@@ -395,27 +395,8 @@ Page({
       return that._nextTick().then(function () {
         const ctx = wx.createCanvasContext('watermarkCanvas', that);
         const imagePath = info.path || localPath;
-        const padding = Math.max(24, Math.round(width * 0.03));
-        const fontSize = Math.max(24, Math.round(width * 0.032));
-        const lineHeight = Math.ceil(fontSize * 1.45);
-        const maxTextWidth = width - padding * 2;
         ctx.drawImage(imagePath, 0, 0, width, height);
-        ctx.setFontSize(fontSize);
-        const lines = that._wrapWatermarkLines(
-          ctx,
-          that._buildWatermarkTextLines(),
-          maxTextWidth,
-          fontSize
-        );
-        const panelHeight = lineHeight * lines.length + padding * 2;
-        const top = Math.max(0, height - panelHeight);
-        ctx.setFillStyle('rgba(0, 0, 0, 0.55)');
-        ctx.fillRect(0, top, width, panelHeight);
-        ctx.setFillStyle('#ffffff');
-        ctx.setFontSize(fontSize);
-        for (let i = 0; i < lines.length; i += 1) {
-          ctx.fillText(lines[i], padding, top + padding + fontSize + i * lineHeight);
-        }
+        that._drawReferenceWatermark(ctx, width, height);
         return that._drawCanvas(ctx).then(function () {
           return that._canvasToTempFilePath(width, height);
         });
@@ -473,7 +454,140 @@ Page({
     });
   },
 
-  _buildWatermarkTextLines() {
+  _drawReferenceWatermark(ctx, width, height) {
+    const scale = Math.max(0.72, Math.min(1.35, width / 1080));
+    const left = Math.round(width * 0.07);
+    const bottom = Math.round(Math.max(44 * scale, height * 0.05));
+    const data = this._buildReferenceWatermarkData(new Date());
+    const cardWidth = Math.round(218 * scale);
+    const cardHeight = Math.round(164 * scale);
+    const headerHeight = Math.round(72 * scale);
+    const cardRadius = Math.round(10 * scale);
+    const textFontSize = Math.round(30 * scale);
+    const smallFontSize = Math.round(27 * scale);
+    const lineHeight = Math.round(47 * scale);
+    const addressLines = this._wrapTextLines(ctx, data.addressText, width - left * 2, textFontSize, 2);
+    const roomLines = this._wrapTextLines(ctx, data.roomText, width - left * 2 - 36 * scale, textFontSize, 2);
+    const blockHeight = Math.round(
+      cardHeight + 50 * scale + lineHeight * (2 + addressLines.length + roomLines.length)
+    );
+    const cardTop = Math.max(Math.round(24 * scale), height - bottom - blockHeight);
+    let y = cardTop;
+
+    this._drawPunchCard(ctx, left, y, cardWidth, cardHeight, headerHeight, cardRadius, scale, data.timeText);
+    y += cardHeight + Math.round(52 * scale);
+
+    this._drawShadowText(ctx, data.dateText, left, y, textFontSize, '#ffffff');
+    y += lineHeight;
+
+    for (let i = 0; i < addressLines.length; i += 1) {
+      this._drawShadowText(ctx, addressLines[i], left, y, textFontSize, '#ffffff');
+      y += lineHeight;
+    }
+
+    const quoteX = left;
+    const roomX = left + Math.round(36 * scale);
+    this._drawShadowText(ctx, '“', quoteX, y, Math.round(42 * scale), '#1bb8df');
+    for (let i = 0; i < roomLines.length; i += 1) {
+      this._drawShadowText(ctx, roomLines[i], roomX, y, textFontSize, '#ffffff');
+      y += lineHeight;
+    }
+
+    this._drawSealText(ctx, left, y, smallFontSize, scale);
+    this._drawBottomBrand(ctx, width, height, scale);
+  },
+
+  _drawPunchCard(ctx, x, y, width, height, headerHeight, radius, scale, timeText) {
+    this._fillRoundRect(ctx, x, y, width, height, radius, 'rgba(255, 255, 255, 0.93)');
+    this._fillRoundRect(ctx, x, y, width, headerHeight + radius, radius, '#21b9df');
+    ctx.setFillStyle('#21b9df');
+    ctx.fillRect(x, y + headerHeight - radius, width, radius);
+    ctx.setFillStyle('rgba(255, 255, 255, 0.94)');
+    ctx.fillRect(x, y + headerHeight, width, height - headerHeight - radius);
+    this._fillRoundRect(
+      ctx,
+      x,
+      y + height - radius * 2,
+      width,
+      radius * 2,
+      radius,
+      'rgba(255, 255, 255, 0.94)'
+    );
+    this._drawPlainText(ctx, '打卡记录', x + 20 * scale, y + 49 * scale, Math.round(38 * scale), '#ffffff');
+    this._drawPlainText(ctx, timeText, x + 20 * scale, y + headerHeight + 70 * scale, Math.round(64 * scale), '#203a60');
+  },
+
+  _fillRoundRect(ctx, x, y, width, height, radius, color) {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+    ctx.setFillStyle(color);
+    ctx.fill();
+  },
+
+  _drawSealText(ctx, x, y, fontSize, scale) {
+    const radius = Math.round(15 * scale);
+    const centerY = y - Math.round(fontSize * 0.35);
+    ctx.beginPath();
+    ctx.arc(x + radius, centerY, radius, 0, Math.PI * 2);
+    ctx.setStrokeStyle('rgba(255, 255, 255, 0.72)');
+    ctx.setLineWidth(Math.max(1, Math.round(2 * scale)));
+    ctx.stroke();
+    this._drawPlainText(
+      ctx,
+      '证',
+      x + Math.round(4 * scale),
+      centerY + Math.round(9 * scale),
+      Math.round(21 * scale),
+      'rgba(255, 255, 255, 0.72)'
+    );
+    this._drawShadowText(
+      ctx,
+      '水印相机已确保时间不可篡改',
+      x + Math.round(44 * scale),
+      y,
+      fontSize,
+      'rgba(255, 255, 255, 0.82)'
+    );
+  },
+
+  _drawBottomBrand(ctx, width, height, scale) {
+    const text = '弱电巡检';
+    const fontSize = Math.round(28 * scale);
+    const textWidth = this._measureText(ctx, text, fontSize);
+    this._drawShadowText(
+      ctx,
+      text,
+      width - textWidth - Math.round(44 * scale),
+      height - Math.round(36 * scale),
+      fontSize,
+      'rgba(255, 255, 255, 0.78)'
+    );
+  },
+
+  _drawPlainText(ctx, text, x, y, fontSize, color) {
+    ctx.setFontSize(fontSize);
+    ctx.setFillStyle(color);
+    ctx.fillText(text, x, y);
+  },
+
+  _drawShadowText(ctx, text, x, y, fontSize, color) {
+    ctx.setFontSize(fontSize);
+    ctx.setFillStyle('rgba(0, 0, 0, 0.38)');
+    ctx.fillText(text, x + 2, y + 2);
+    ctx.setFillStyle(color);
+    ctx.fillText(text, x, y);
+  },
+
+  _buildReferenceWatermarkData(date) {
     const locationText = [
       this.data.buildingName,
       this.data.floor,
@@ -487,13 +601,12 @@ Page({
     ].filter(function (item) {
       return !!item;
     }).join(' ');
-    return [
-      '时间：' + this._formatWatermarkTime(new Date()),
-      '地点：' + (locationText || '-'),
-      '地图：' + (this._getMapLocationLabel() || '未确认地图位置名称'),
-      '坐标：' + (this._hasLocation() ? this.data.geoLocationText : '未获取定位'),
-      '房间：' + (roomText || '-'),
-    ];
+    return {
+      timeText: this._formatWatermarkClock(date),
+      dateText: this._formatWatermarkDateWeek(date),
+      addressText: this._getMapLocationLabel() || this.data.buildingName || this.data.geoLocationText || '未确认地图位置名称',
+      roomText: locationText || roomText || '-',
+    };
   },
 
   _getMapLocationLabel() {
@@ -503,7 +616,12 @@ Page({
     return '';
   },
 
-  _formatWatermarkTime(date) {
+  _formatWatermarkClock(date) {
+    return this._pad2(date.getHours()) + ':' + this._pad2(date.getMinutes());
+  },
+
+  _formatWatermarkDateWeek(date) {
+    const weekLabels = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
     return [
       date.getFullYear(),
       '-',
@@ -511,11 +629,7 @@ Page({
       '-',
       this._pad2(date.getDate()),
       ' ',
-      this._pad2(date.getHours()),
-      ':',
-      this._pad2(date.getMinutes()),
-      ':',
-      this._pad2(date.getSeconds()),
+      weekLabels[date.getDay()],
     ].join('');
   },
 
@@ -524,32 +638,37 @@ Page({
     return text.length < 2 ? '0' + text : text;
   },
 
-  _wrapWatermarkLines(ctx, lines, maxWidth, fontSize) {
+  _wrapTextLines(ctx, text, maxWidth, fontSize, maxLines) {
     const result = [];
-    for (let i = 0; i < lines.length; i += 1) {
-      const line = lines[i];
-      if (this._measureText(ctx, line, fontSize) <= maxWidth) {
-        result.push(line);
-        continue;
-      }
-      let current = '';
-      for (let j = 0; j < line.length; j += 1) {
-        const next = current + line[j];
-        if (current && this._measureText(ctx, next, fontSize) > maxWidth) {
-          result.push(current);
-          current = line[j];
-        } else {
-          current = next;
-        }
-      }
-      if (current) {
+    let current = '';
+    const source = String(text || '-');
+    for (let i = 0; i < source.length; i += 1) {
+      const next = current + source[i];
+      if (current && this._measureText(ctx, next, fontSize) > maxWidth) {
         result.push(current);
+        current = source[i];
+        if (result.length === maxLines - 1) {
+          break;
+        }
+      } else {
+        current = next;
       }
+    }
+    if (current && result.length < maxLines) {
+      result.push(current);
+    }
+    if (result.length === maxLines && source.length > result.join('').length) {
+      let last = result[result.length - 1];
+      while (last.length > 0 && this._measureText(ctx, last + '…', fontSize) > maxWidth) {
+        last = last.slice(0, -1);
+      }
+      result[result.length - 1] = last + '…';
     }
     return result;
   },
 
   _measureText(ctx, text, fontSize) {
+    ctx.setFontSize(fontSize);
     if (ctx.measureText) {
       const metrics = ctx.measureText(text);
       if (metrics && metrics.width) {

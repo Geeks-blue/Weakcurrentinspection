@@ -2099,7 +2099,7 @@ onUnmounted(() => {
             </div>
           </div>
           <div class="actions">
-            <button class="ghost" :disabled="pendingTasksLoading" @click="loadPendingTasks">
+            <button class="ghost" :disabled="pendingTasksLoading" @click="() => loadPendingTasks()">
               {{ pendingTasksLoading ? "加载中..." : "刷新待巡检任务" }}
             </button>
           </div>
@@ -2375,7 +2375,7 @@ onUnmounted(() => {
         <section class="panel" v-if="isReviewer && workspaceSub === 'inspection'">
           <h2>巡检审核中心</h2>
           <div class="actions">
-            <button :disabled="pendingLoading" @click="loadPendingReviews">
+            <button :disabled="pendingLoading" @click="() => loadPendingReviews()">
               {{ pendingLoading ? "加载中..." : "刷新待审核列表" }}
             </button>
           </div>

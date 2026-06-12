@@ -165,11 +165,13 @@ ALTER TABLE rooms ADD COLUMN IF NOT EXISTS gender_restriction VARCHAR(16) NOT NU
 | `WECHAT_TASK_MINIPROGRAM_APPID` | 公众号模板消息跳转小程序 AppID（可选） |
 | `WECHAT_TASK_MINIPROGRAM_PAGEPATH` | 公众号模板消息跳转小程序路径，默认任务列表 |
 | `TENCENT_MAP_KEY` | 腾讯位置服务 Key，用于小程序经纬度反查文字位置 |
+| `TENCENT_MAP_SECRET_KEY` | 腾讯位置服务签名校验 SK，用于后端生成 WebServiceAPI `sig` |
 | `AI_PROVIDER_API_KEY` | AI 服务 API Key（选填） |
 | `AI_DEFAULT_ENDPOINT` | AI 接口地址，默认 OpenAI |
 | `AI_DEFAULT_MODEL` | 默认模型，默认 gpt-4o-mini |
 
 公众号派单通知需要学生关注公众号，并在管理端账户管理中维护该学生的公众号 OpenID；未绑定或未配置模板时，派单仍会成功，仅跳过通知。
+小程序文字位置解析使用腾讯位置服务 WebServiceAPI，若 Key 选择“签名校验”，需同时配置 `TENCENT_MAP_KEY` 和 `TENCENT_MAP_SECRET_KEY`，后端会代理生成 `sig` 并调用腾讯接口。
 
 ---
 

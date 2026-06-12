@@ -29,6 +29,7 @@ class Settings:
     wechat_task_miniprogram_appid: str = os.getenv("WECHAT_TASK_MINIPROGRAM_APPID", "")
     wechat_task_miniprogram_pagepath: str = os.getenv("WECHAT_TASK_MINIPROGRAM_PAGEPATH", "")
     tencent_map_key: str = os.getenv("TENCENT_MAP_KEY", "")
+    tencent_map_secret_key: str = os.getenv("TENCENT_MAP_SECRET_KEY", "")
 
     @property
     def cors_allow_origins_list(self) -> list[str]:

@@ -1,6 +1,7 @@
 import hashlib
 import time
 import uuid
+from urllib.parse import urlencode
 
 import httpx
 from app.core.config import settings
@@ -10,6 +11,7 @@ router = APIRouter()
 
 _token_cache: dict = {"token": "", "expires_at": 0.0}
 _ticket_cache: dict = {"ticket": "", "expires_at": 0.0}
+_TENCENT_GEOCODER_PATH = "/ws/geocoder/v1/"
 
 
 async def _get_access_token() -> str:
@@ -81,16 +83,15 @@ async def reverse_geocode(
 ):
     if not settings.tencent_map_key:
         raise HTTPException(status_code=503, detail="Tencent Map key not configured")
+    if not settings.tencent_map_secret_key:
+        raise HTTPException(
+            status_code=503, detail="Tencent Map secret key not configured"
+        )
 
     try:
         async with httpx.AsyncClient(timeout=6) as client:
             resp = await client.get(
-                "https://apis.map.qq.com/ws/geocoder/v1/",
-                params={
-                    "location": f"{latitude},{longitude}",
-                    "key": settings.tencent_map_key,
-                    "get_poi": 0,
-                },
+                _build_tencent_geocoder_url(latitude=latitude, longitude=longitude),
             )
             resp.raise_for_status()
             data = resp.json()
@@ -122,3 +123,18 @@ async def reverse_geocode(
         "city": component.get("city") or "",
         "district": component.get("district") or "",
     }
+
+
+def _build_tencent_geocoder_url(*, latitude: float, longitude: float) -> str:
+    location = f"{latitude},{longitude}"
+    query = urlencode(
+        [
+            ("get_poi", "0"),
+            ("key", settings.tencent_map_key),
+            ("location", location),
+        ],
+        safe=",",
+    )
+    sig_raw = f"{_TENCENT_GEOCODER_PATH}?{query}{settings.tencent_map_secret_key}"
+    sig = hashlib.md5(sig_raw.encode("utf-8")).hexdigest()
+    return f"https://apis.map.qq.com{_TENCENT_GEOCODER_PATH}?{query}&sig={sig}"

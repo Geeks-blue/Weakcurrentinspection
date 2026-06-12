@@ -17,11 +17,17 @@
 - WECHAT_TASK_NOTIFY_URL=公众号模板消息跳转网页地址（可选）
 - WECHAT_TASK_MINIPROGRAM_APPID=公众号模板消息跳转小程序 AppID（可选）
 - WECHAT_TASK_MINIPROGRAM_PAGEPATH=pages/student/tasks/tasks
+- TENCENT_MAP_SECRET_KEY=腾讯位置服务 Key 的签名校验 Secret key（SK）
 
 公众号派单通知说明：
 - 学生账号需在管理端账户管理中填写公众号 OpenID。
 - 模板消息建议包含 `first`、`keyword1`（任务标题）、`keyword2`（房间）、`keyword3`（截止时间）、`keyword4`（派发人）、`remark`。
 - 若未配置模板 ID、AppID/AppSecret 或学生 OpenID，派单仍会成功，仅跳过公众号通知。
+
+小程序文字位置解析说明：
+- 腾讯位置服务 Key 需启用 WebServiceAPI。
+- 授权方式选择“签名校验”时，需要同时配置 `TENCENT_MAP_KEY` 和 `TENCENT_MAP_SECRET_KEY`。
+- 后端会按 `/ws/geocoder/v1/?get_poi=0&key=...&location=lat,lng + SK` 计算 `sig`，小程序端不会暴露 Key 或 SK。
 
 ## 1. 创建并激活虚拟环境（PowerShell）
 python -m venv .venv

@@ -1,30 +1,69 @@
 // pages/student/tasks/tasks.js
-const api = require('../../../utils/api');
-const fmt = require('../../../utils/format');
+const api = require("../../../utils/api");
+const fmt = require("../../../utils/format");
 
 Page({
   data: {
     tasks: [],
     loading: false,
-    error: '',
-    username: '',
-    filterText: '',
+    error: "",
+    username: "",
+    filterText: "",
     filteredTasks: [],
   },
 
   onLoad() {
     const app = getApp();
     if (!app.globalData.token) {
-      wx.redirectTo({ url: '/pages/login/login' });
+      wx.redirectTo({ url: "/pages/login/login" });
       return;
     }
     const user = app.globalData.user || {};
-    this.setData({ username: user.username || '' });
-    this.loadTasks();
+    this.setData({ username: user.username || "" });
   },
 
-  async loadTasks() {
-    this.setData({ loading: true, error: '' });
+  onShow() {
+    if (!getApp().globalData.token) return;
+    this.loadTasks(this.data.tasks.length > 0);
+    this._startAutoRefresh();
+  },
+
+  onHide() {
+    this._stopAutoRefresh();
+  },
+
+  onUnload() {
+    this._stopAutoRefresh();
+  },
+
+  async onPullDownRefresh() {
+    await this.loadTasks(false);
+    wx.stopPullDownRefresh();
+  },
+
+  _startAutoRefresh() {
+    this._stopAutoRefresh();
+    const that = this;
+    this._refreshTimer = setInterval(function () {
+      that.loadTasks(true);
+    }, 10000);
+  },
+
+  _stopAutoRefresh() {
+    if (this._refreshTimer) {
+      clearInterval(this._refreshTimer);
+      this._refreshTimer = null;
+    }
+  },
+
+  async loadTasks(silent) {
+    if (this._loadingTasks) return;
+    this._loadingTasks = true;
+    if (!silent) {
+      this.setData({ loading: true, error: "" });
+    } else {
+      this.setData({ error: "" });
+    }
     try {
       const tasks = await api.getMyTasks();
       const enriched = [];
@@ -36,6 +75,7 @@ Page({
           building_code: t.building_code,
           building_name: t.building_name,
           room_code: t.room_code,
+          room_name: t.room_name || t.location_text || "",
           floor_label: t.floor_label,
           location_text: t.location_text,
           due_at: t.due_at,
@@ -50,7 +90,10 @@ Page({
     } catch (e) {
       this.setData({ error: e.message });
     } finally {
-      this.setData({ loading: false });
+      if (!silent) {
+        this.setData({ loading: false });
+      }
+      this._loadingTasks = false;
     }
   },
 
@@ -69,10 +112,14 @@ Page({
     }
     for (let i = 0; i < all.length; i += 1) {
       const t = all[i];
-      const title = String(t.task_title || '').toLowerCase();
-      const room = String(t.room_code || '').toLowerCase();
-      const building = String(t.building_name || '').toLowerCase();
-      if (title.indexOf(q) !== -1 || room.indexOf(q) !== -1 || building.indexOf(q) !== -1) {
+      const title = String(t.task_title || "").toLowerCase();
+      const room = String(t.room_code || "").toLowerCase();
+      const building = String(t.building_name || "").toLowerCase();
+      if (
+        title.indexOf(q) !== -1 ||
+        room.indexOf(q) !== -1 ||
+        building.indexOf(q) !== -1
+      ) {
         filtered.push(t);
       }
     }
@@ -89,36 +136,39 @@ Page({
       }
     }
     if (!task) {
-      wx.showToast({ title: '任务不存在，请刷新', icon: 'none' });
+      wx.showToast({ title: "任务不存在，请刷新", icon: "none" });
       return;
     }
-    if (task.status === 'done' || task.status === 'approved') {
-      wx.showToast({ title: '该任务已完成', icon: 'none' });
+    if (task.status === "done" || task.status === "approved") {
+      wx.showToast({ title: "该任务已完成", icon: "none" });
       return;
     }
     const params = [
-      'assignmentId=' + encodeURIComponent(task.assignment_id),
-      'roomCode=' + encodeURIComponent(task.room_code || ''),
-      'buildingName=' + encodeURIComponent(task.building_name || task.building_code || ''),
-      'taskTitle=' + encodeURIComponent(task.task_title || ''),
-      'floor=' + encodeURIComponent(task.floor_label || ''),
-      'location=' + encodeURIComponent(task.location_text || ''),
-    ].join('&');
+      "assignmentId=" + encodeURIComponent(task.assignment_id),
+      "roomCode=" + encodeURIComponent(task.room_code || ""),
+      "buildingName=" +
+        encodeURIComponent(task.building_name || task.building_code || ""),
+      "roomName=" +
+        encodeURIComponent(task.room_name || task.location_text || ""),
+      "taskTitle=" + encodeURIComponent(task.task_title || ""),
+      "floor=" + encodeURIComponent(task.floor_label || ""),
+      "location=" + encodeURIComponent(task.location_text || ""),
+    ].join("&");
     wx.navigateTo({
-      url: '/pages/student/inspect/inspect?' + params
+      url: "/pages/student/inspect/inspect?" + params,
     });
   },
 
   onLogout() {
     wx.showModal({
-      title: '退出登录',
-      content: '确定退出吗？',
+      title: "退出登录",
+      content: "确定退出吗？",
       success(res) {
         if (res.confirm) {
           getApp().clearAuth();
-          wx.redirectTo({ url: '/pages/login/login' });
+          wx.redirectTo({ url: "/pages/login/login" });
         }
-      }
+      },
     });
-  }
+  },
 });

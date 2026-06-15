@@ -27,6 +27,8 @@ class TaskAssignmentItem(BaseModel):
 class TaskAssignmentCreateResponse(BaseModel):
     assignment_id: int
     message: str
+    notification_sent: bool = False
+    notification_message: str | None = None
 
 
 class DispatchRoomOption(BaseModel):
@@ -41,6 +43,7 @@ class DispatchStudentOption(BaseModel):
     student_user_id: int
     username: str
     gender: str | None
+    wechat_bound: bool = False
 
 
 class TaskDispatchOptionsResponse(BaseModel):

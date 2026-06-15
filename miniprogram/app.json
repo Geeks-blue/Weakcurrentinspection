@@ -15,6 +15,12 @@
     "backgroundColor": "#eef3f9",
     "backgroundTextStyle": "light"
   },
+  "permission": {
+    "scope.userLocation": {
+      "desc": "用于巡检签到和照片水印记录当前位置"
+    }
+  },
+  "requiredPrivateInfos": ["getLocation"],
   "lazyCodeLoading": "requiredComponents",
   "usingComponents": {},
   "sitemapLocation": "sitemap.json"

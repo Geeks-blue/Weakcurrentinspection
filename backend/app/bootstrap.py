@@ -1,6 +1,7 @@
 ﻿# 文件说明：该文件为弱电巡检系统源码，已按中文注释规范维护。
 from datetime import UTC, datetime, timedelta
 
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
@@ -12,11 +13,23 @@ from app.models.entities import Inspection, InspectionPhoto
 
 def init_db_and_seed() -> None:
     Base.metadata.create_all(bind=engine)
+    _ensure_schema_compatibility()
     with SessionLocal() as db:
         _seed_users(db)
         _seed_buildings_and_rooms(db)
         _seed_demo_tasks(db)
         _seed_demo_inspection_submission(db)
+
+
+def _ensure_schema_compatibility() -> None:
+    inspector = inspect(engine)
+    if "users" not in inspector.get_table_names():
+        return
+
+    user_columns = {column["name"] for column in inspector.get_columns("users")}
+    with engine.begin() as conn:
+        if "wechat_openid" not in user_columns:
+            conn.execute(text("ALTER TABLE users ADD COLUMN wechat_openid VARCHAR(128)"))
 
 
 def _seed_users(db: Session) -> None:

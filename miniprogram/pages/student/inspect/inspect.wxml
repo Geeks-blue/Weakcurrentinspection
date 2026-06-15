@@ -7,6 +7,23 @@
     <text class="hint">任务：{{taskTitle}}</text>
   </view>
 
+  <view class="card geo-card">
+    <view class="geo-head">
+      <view class="section-title geo-title">地理位置</view>
+      <view class="geo-actions">
+        <button
+          class="btn btn-ghost btn-sm geo-refresh"
+          loading="{{geoLocationLoading}}"
+          disabled="{{geoLocationLoading}}"
+          bindtap="onRefreshLocation"
+        >{{geoLocationButtonText}}</button>
+      </view>
+    </view>
+    <text class="geo-name">{{mapLocationText}}</text>
+    <text class="geo-text">{{geoLocationText}}</text>
+    <text class="error-tip" wx:if="{{geoLocationError}}">{{geoLocationError}}</text>
+  </view>
+
   <!-- 签到方式 -->
   <view class="card">
     <view class="section-title">签到方式</view>
@@ -130,3 +147,8 @@
   </view>
 </view>
 </scroll-view>
+<canvas
+  canvas-id="watermarkCanvas"
+  class="watermark-canvas"
+  style="width: {{watermarkCanvasWidth}}px; height: {{watermarkCanvasHeight}}px;"
+></canvas>

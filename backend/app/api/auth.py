@@ -63,6 +63,7 @@ def register_user(
         password_hash=hash_password(payload.password),
         role=payload.role,
         gender=payload.gender,
+        wechat_openid=payload.wechat_openid,
         is_active=payload.is_active,
     )
     db.add(user)
@@ -82,7 +83,17 @@ def list_users(
 ) -> list[UserManageItem]:
     """管理员查看所有用户列表（按 ID 升序）。"""
     users = db.query(User).order_by(User.id.asc()).all()
-    return [UserManageItem(id=u.id, username=u.username, role=u.role, gender=u.gender, is_active=u.is_active) for u in users]
+    return [
+        UserManageItem(
+            id=u.id,
+            username=u.username,
+            role=u.role,
+            gender=u.gender,
+            wechat_openid=u.wechat_openid,
+            is_active=u.is_active,
+        )
+        for u in users
+    ]
 
 
 @router.put("/users/{user_id}", response_model=UserManageItem)
@@ -100,13 +111,22 @@ def update_user(
         user.role = payload.role
     if payload.gender is not None or payload.role == "student":
         user.gender = payload.gender
+    if "wechat_openid" in payload.model_fields_set:
+        user.wechat_openid = (payload.wechat_openid or "").strip() or None
     if payload.is_active is not None:
         user.is_active = payload.is_active
     if payload.new_password:
         user.password_hash = hash_password(payload.new_password)
     db.commit()
     db.refresh(user)
-    return UserManageItem(id=user.id, username=user.username, role=user.role, gender=user.gender, is_active=user.is_active)
+    return UserManageItem(
+        id=user.id,
+        username=user.username,
+        role=user.role,
+        gender=user.gender,
+        wechat_openid=user.wechat_openid,
+        is_active=user.is_active,
+    )
 
 
 @router.delete("/users/{user_id}")

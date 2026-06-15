@@ -31,6 +31,7 @@ from app.schemas.task import (
     TaskAssignmentUpdateResponse,
     UpdateTaskAssignmentRequest,
 )
+from app.services.wechat_notifications import send_task_assignment_notification
 
 router = APIRouter()
 UPLOAD_DIR = Path(__file__).resolve().parents[2] / "storage" / "inspection_photos"
@@ -83,6 +84,7 @@ def dispatch_options(
             student_user_id=student.id,
             username=student.username,
             gender=student.gender,
+            wechat_bound=bool(student.wechat_openid),
         )
         for student in student_rows
     ]
@@ -154,9 +156,19 @@ def create_assignment(
             detail="Duplicated assignment key for task/room/student",
         ) from exc
 
+    notification = send_task_assignment_notification(
+        openid=student.wechat_openid,
+        task_title=task.title,
+        room_label=f"{building.name or building.code} / {room.room_code}",
+        due_at=assignment.due_at,
+        assigner_name=current_user.username,
+    )
+
     return TaskAssignmentCreateResponse(
         assignment_id=assignment.id,
         message="Task assignment created",
+        notification_sent=notification.sent,
+        notification_message=notification.message,
     )
 
 

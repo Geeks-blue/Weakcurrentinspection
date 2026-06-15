@@ -99,6 +99,14 @@ const api = {
     return request('GET', '/inspections/room-reference-photo?room_code=' + encodeURIComponent(roomCode));
   },
 
+  reverseGeocode: function (latitude, longitude) {
+    const query = [
+      'latitude=' + encodeURIComponent(String(latitude)),
+      'longitude=' + encodeURIComponent(String(longitude)),
+    ].join('&');
+    return request('GET', '/wechat/reverse-geocode?' + query);
+  },
+
   // 照片上传
   uploadPhoto: function (localPath, filename) { return uploadFile(localPath, filename); },
   getPhotoUrl: function (objectKey) { return getBaseUrl() + '/inspections/photos/' + objectKey; },

@@ -41,6 +41,8 @@
 
 ## 快速启动
 
+> ⚠️ **Windows 说明**：当前项目不再保证在原生 Windows PowerShell/CMD 下完整运行。数据库、对象存储、HTTPS 证书、Docker Compose 与部分脚本在 Windows 原生环境下容易出现路径、权限、证书和网络差异。Windows 用户建议使用 **WSL2 Ubuntu + Docker Desktop（启用 WSL 集成）** 运行以下命令；原生 Windows 仅建议用于前端调试或微信开发者工具导入小程序。
+
 ### 1. 准备环境
 
 ```bash
@@ -52,6 +54,14 @@ cd weakcurrentinspection
 cp .env.example .env
 # 编辑 .env 修改数据库密码、JWT 密钥等
 ```
+
+Windows 原生 PowerShell 若只做临时调试，可用：
+
+```powershell
+Copy-Item .env.example .env
+```
+
+但后续后端、数据库和 HTTPS 部署仍建议切到 WSL2 终端执行。
 
 ### 2. 启动基础服务（Docker）
 
@@ -65,10 +75,6 @@ docker compose up -d
 ```bash
 cd backend
 python -m venv .venv
-
-# Windows PowerShell
-.\.venv\Scripts\Activate.ps1
-# macOS/Linux
 source .venv/bin/activate
 
 pip install -r requirements.txt
@@ -76,6 +82,25 @@ pip install -r requirements.txt
 # 首次运行自动建表并创建种子账号
 uvicorn app.main:app --reload --host 0.0.0.0 --port 18000
 ```
+
+Windows 原生 PowerShell 临时调试时可执行：
+
+```powershell
+cd backend
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 18000
+```
+
+如 PowerShell 禁止激活脚本，可先执行：
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+> 原生 Windows 下若依赖安装、Docker 网络或证书信任异常，请不要继续排查 PowerShell 环境，直接使用 WSL2。
 
 ### 4. 启动管理端前端
 
@@ -123,6 +148,30 @@ iPhone 导入根证书：`设置 → 通用 → VPN与设备管理 → 安装 �
 
 ---
 
+## Windows 运行策略
+
+| 场景 | 支持建议 |
+|------|----------|
+| 小程序开发者工具导入 `miniprogram/` | 支持 Windows |
+| 管理端/移动端前端 `npm run dev` | 可在 Windows 原生运行 |
+| 后端 + PostgreSQL + MinIO + HTTPS 全栈联调 | 推荐 WSL2 Ubuntu |
+| 生产部署/CloudBase 镜像构建 | 使用 Linux/云端构建环境 |
+
+推荐 Windows 开发流程：
+
+1. 安装 Docker Desktop，并开启 WSL2 backend。
+2. 安装 Ubuntu WSL2，并在 Docker Desktop 设置中启用该发行版集成。
+3. 在 WSL2 内克隆仓库、复制 `.env`、执行 `docker compose up -d`。
+4. 在 WSL2 内启动后端和前端；Windows 侧浏览器/微信开发者工具访问 WSL 暴露的地址。
+
+不推荐：
+
+- 在原生 Windows 下跑生产 HTTPS 部署。
+- 在原生 Windows 下维护 PostgreSQL 数据目录和 MinIO 数据目录。
+- 混用 Windows 路径与 WSL 路径启动 Docker Compose。
+
+---
+
 ## 数据库迁移
 
 新增字段时需手动执行 SQL（使用 psql 或 pgAdmin）：
@@ -160,9 +209,18 @@ ALTER TABLE rooms ADD COLUMN IF NOT EXISTS gender_restriction VARCHAR(16) NOT NU
 | `MINIO_ROOT_PASSWORD` | MinIO 管理员密码，**生产必须修改** |
 | `WECHAT_APPID` | 微信公众号 AppID（扫一扫功能，选填） |
 | `WECHAT_APPSECRET` | 微信公众号 AppSecret（选填） |
+| `WECHAT_TASK_TEMPLATE_ID` | 公众号任务派发模板消息 ID（派单通知） |
+| `WECHAT_TASK_NOTIFY_URL` | 公众号模板消息跳转网页地址（可选） |
+| `WECHAT_TASK_MINIPROGRAM_APPID` | 公众号模板消息跳转小程序 AppID（可选） |
+| `WECHAT_TASK_MINIPROGRAM_PAGEPATH` | 公众号模板消息跳转小程序路径，默认任务列表 |
+| `TENCENT_MAP_KEY` | 腾讯位置服务 Key，用于小程序经纬度反查文字位置 |
+| `TENCENT_MAP_SECRET_KEY` | 腾讯位置服务签名校验 SK，用于后端生成 WebServiceAPI `sig` |
 | `AI_PROVIDER_API_KEY` | AI 服务 API Key（选填） |
 | `AI_DEFAULT_ENDPOINT` | AI 接口地址，默认 OpenAI |
 | `AI_DEFAULT_MODEL` | 默认模型，默认 gpt-4o-mini |
+
+公众号派单通知需要学生关注公众号，并在管理端账户管理中维护该学生的公众号 OpenID；未绑定或未配置模板时，派单仍会成功，仅跳过通知。
+小程序文字位置解析使用腾讯位置服务 WebServiceAPI，若 Key 选择“签名校验”，需同时配置 `TENCENT_MAP_KEY` 和 `TENCENT_MAP_SECRET_KEY`，后端会代理生成 `sig` 并调用腾讯接口。
 
 ---
 
@@ -281,10 +339,12 @@ JSSDK 代码已集成，配置步骤：
   - [frontend/mobile-web/src/api.ts](frontend/mobile-web/src/api.ts)
 
 ## 4. 快速启动
+> Windows 用户请优先在 WSL2 Ubuntu 中执行。原生 Windows PowerShell 只建议用于前端调试，不建议跑完整后端/数据库/HTTPS 链路。
+
 1. 启动基础服务：docker compose up -d
 2. 启动后端（进入 backend 目录）：
    - python -m venv .venv
-   - .\.venv\Scripts\Activate.ps1
+   - source .venv/bin/activate
    - pip install -r requirements.txt
    - uvicorn app.main:app --reload --host 0.0.0.0 --port 18000
 3. 启动前端管理端（进入 frontend/admin-web 目录）：

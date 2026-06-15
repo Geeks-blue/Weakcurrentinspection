@@ -31,6 +31,7 @@ class RegisterUserRequest(BaseModel):
     password: str = Field(..., min_length=6, max_length=128)
     role: UserRole
     gender: UserGender | None = None
+    wechat_openid: str | None = Field(default=None, max_length=128)
     is_active: bool = True
 
     @model_validator(mode="after")
@@ -40,6 +41,7 @@ class RegisterUserRequest(BaseModel):
             raise ValueError("Student role requires gender")
         if self.role != "student":
             self.gender = None
+        self.wechat_openid = (self.wechat_openid or "").strip() or None
         return self
 
 
@@ -53,12 +55,14 @@ class UserManageItem(BaseModel):
     username: str
     role: str
     gender: str | None
+    wechat_openid: str | None
     is_active: bool
 
 
 class UpdateUserRequest(BaseModel):
     role: UserRole | None = None
     gender: UserGender | None = None
+    wechat_openid: str | None = Field(default=None, max_length=128)
     is_active: bool | None = None
     new_password: str | None = Field(default=None, min_length=6, max_length=128)
 

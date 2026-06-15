@@ -5,6 +5,8 @@
 2. 将根 CA 证书导入到 iPhone/iPad 的信任列表
 3. 启动 Nginx（Docker Compose）和带 SSL 的 FastAPI
 
+> ⚠️ Windows 原生环境不再推荐执行完整 HTTPS 部署流程。Windows 用户建议使用 **WSL2 Ubuntu** 生成证书、构建前端并启动 Docker Compose；Windows 侧只负责浏览器访问、微信开发者工具和证书导入。
+
 ---
 
 ## 第一步：在服务器上安装 mkcert
@@ -28,6 +30,22 @@ mkcert -install
 
 ```bash
 brew install mkcert
+mkcert -install
+```
+
+### Windows
+
+推荐在 WSL2 Ubuntu 中按 Linux 步骤执行。若必须在 Windows 原生环境生成证书，可使用 Chocolatey/Scoop 安装 mkcert，但后续 Nginx、Docker Compose 和 FastAPI HTTPS 启动仍建议在 WSL2 内完成。
+
+PowerShell 示例：
+
+```powershell
+# Chocolatey
+choco install mkcert
+
+# 或 Scoop
+scoop install mkcert
+
 mkcert -install
 ```
 
@@ -151,6 +169,14 @@ uvicorn app.main:app \
   --ssl-keyfile nginx/ssl/server.key \
   --ssl-certfile nginx/ssl/server.crt
 ```
+
+Windows PowerShell 临时调试可写成单行：
+
+```powershell
+python -m uvicorn app.main:app --host 0.0.0.0 --port 18000 --ssl-keyfile ../nginx/ssl/server.key --ssl-certfile ../nginx/ssl/server.crt
+```
+
+> 注意：PowerShell 下路径、证书信任和防火墙策略更容易出错；生产或多人联调请使用 WSL2/Linux。
 
 ---
 
